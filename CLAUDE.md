@@ -49,9 +49,9 @@
 |------|------|------|
 | 项目目标 | `docs/GOAL.md` | 项目愿景、学习目标、实现阶段、设计原则 |
 | 架构设计 | `docs/ARCHITECTURE.md` | 整体架构、模块划分、核心流程、数据存储 |
-| Phase 1 实现计划 | `docs/plans/phase1-mvp.md` | MVP 阶段详细计划与进度 |
-| Phase 2 实现计划 | `docs/plans/phase2-memory.md` | 记忆与用户建模阶段计划与进度 |
-| Phase 3 实现计划 | `docs/plans/phase3-skills.md` | 技能系统阶段计划与进度 |
+| Agent 开发 SOP | `docs/dev-sop.md` | Agent 开发工作流规范，5原则 + 9环节完整闭环 |
+| 需求对齐与设计 | `docs/superpowers/specs/` | 需求澄清结论与设计方案文档 |
+| 任务规划与进度 | `docs/superpowers/plans/` | 任务分解、执行计划与进度状态 |
 
 ## 参考资源
 
