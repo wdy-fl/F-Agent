@@ -307,9 +307,10 @@ registry.register(
 
 ### 7.2 发现机制
 
-- 启动时扫描 `tools/*.py`
-- 用 AST 检测文件中是否包含 `registry.register` 调用
-- 有则 import 触发注册
+> **2026-05-13 调整**：MVP 阶段采用显式注册，AST 发现留到后续。
+
+- MVP：在 `tools/__init__.py` 中显式 import 各工具模块触发注册
+- 后续：启动时扫描 `tools/*.py`，用 AST 检测文件中是否包含 `registry.register` 调用，有则 import 触发注册
 
 ### 7.3 调度流程
 
@@ -413,45 +414,79 @@ END;
 
 ### Phase 1 — 最小可运行 Agent（MVP）
 
-1. **基础设施搭建**
-   - 项目结构初始化 + 依赖管理
-   - `config/settings.py`：YAML 配置加载 + 环境变量覆盖
-   - `llm/client.py`：OpenAI SDK 封装，支持 base_url 切换模型
+> **2026-05-13 调整记录**：基于开发讨论，对 Phase 1 做了以下调整：
+> 1. 增加早期检查点（Checkpoint），尽早验证 LLM 调用链路
+> 2. 合并推进会话持久化与 Agent 核心，会话存储先做最小版（无 FTS5）
+> 3. 工具注册采用显式注册（非 AST 发现），降低 MVP 复杂度
+> 4. 增加测试要求：每个模块至少一个冒烟测试
+> 5. 明确配置 schema，覆盖 MVP 所需全部配置项
 
-2. **工具系统**
-   - `tools/registry.py`：注册表 + AST 发现 + 调度
-   - `tools/terminal.py`：终端执行
-   - `tools/file_ops.py`：文件读写 + 列目录
-   - `tools/web_search.py`：Web 搜索 + 网页抓取
+#### Step 1 — 基础设施搭建
 
-3. **会话持久化**
-   - `db/schema.py`：建表 + FTS5 索引
-   - `db/session.py`：会话 CRUD + 消息存储
+- 项目结构初始化 + 依赖管理（pyproject.toml / requirements.txt）
+- `config/settings.py`：YAML 配置加载 + 环境变量覆盖
+  - MVP 配置 schema：model、base_url、api_key、context_window、max_iterations、max_result_size
+- `llm/client.py`：OpenAI SDK 封装，支持 base_url 切换模型
+- **测试**：LLM Client 冒烟测试（mock API 验证调用链路）
 
-4. **Agent 核心**
-   - `agent/budget.py`：预算控制 + 中断信号
-   - `agent/prompt.py`：系统提示词构建
-   - `agent/loop.py`：主循环（LLM 调用 + 工具执行 + 消息管理）
+#### Checkpoint — 最简主循环可运行
 
-5. **CLI 界面**
-   - `cli/interface.py`：prompt_toolkit 输入 + rich 输出
-   - `main.py`：入口集成
+- `agent/loop.py`：最简主循环（只处理纯文本对话，无工具调用）
+- `agent/prompt.py`：基础系统提示词
+- `main.py`：`python3 main.py` 能启动并完成一轮对话
+- **价值**：尽早验证 LLM SDK 调用链路、API Key 配置、流式输出等基础能力
 
-**交付标准**：`python3 main.py` 启动后，能对话、能调用工具、能持久化会话。
+#### Step 2 — 工具系统
+
+- `tools/registry.py`：注册表 + 显式注册 + 调度
+  - MVP 阶段用显式注册（在 `tools/__init__.py` 中 import 各工具模块触发注册）
+  - AST 自动发现留到工具数量增多时再加
+- `tools/terminal.py`：终端执行
+- `tools/file_ops.py`：文件读写 + 列目录
+- `tools/web_search.py`：Web 搜索 + 网页抓取
+- **测试**：工具调度冒烟测试（并发安全判断 + 结果截断）
+
+#### Step 3 — 会话持久化（最小版）
+
+- `db/schema.py`：建表（sessions + messages，暂不含 FTS5）
+- `db/session.py`：会话 CRUD + 消息 INSERT/SELECT
+- FTS5 全文索引和搜索召回留到 Phase 2 补全
+- **测试**：SQLite 操作冒烟测试
+
+#### Step 4 — 完整 Agent 核心
+
+- `agent/budget.py`：预算控制 + 中断信号
+- `agent/loop.py`：扩展主循环（加入工具执行 + 消息管理）
+- `agent/prompt.py`：扩展提示词构建（加入工具 schema）
+- 集成会话持久化到主循环
+- **测试**：预算控制边界测试 + 主循环集成测试
+
+#### Step 5 — CLI 界面
+
+- `cli/interface.py`：prompt_toolkit 输入 + rich 输出
+- `main.py`：完整入口集成
+- **交付标准**：`python3 main.py` 启动后，能对话、能调用工具、能持久化会话。
 
 ### Phase 2 — 记忆与用户建模
 
+> Phase 2 先于 Phase 3，因为技能系统的"自改进"依赖记忆系统的 FTS5 搜索来评估技能效果。
+
 1. **记忆基础设施**
+   - `db/schema.py`：补全 FTS5 全文索引 + 自动同步触发器
+   - `db/session.py`：补全 FTS5 搜索召回
    - `memory/context_fence.py`：上下文围栏
    - `memory/manager.py`：记忆 prefetch + sync
    - FTS5 搜索召回集成到主循环
+   - **测试**：FTS5 搜索准确性测试 + 围栏注入/剥离测试
 
 2. **用户建模**
    - `memory/user_profile.py`：USER.md 读写 + LLM 驱动更新
    - `tools/memory.py`：记忆工具（供 LLM 调用）
+   - **测试**：画像更新流程测试
 
 3. **上下文压缩**
    - `context/compressor.py`：工具结果裁剪 + LLM 结构化摘要
+   - **测试**：压缩边界条件测试（阈值触发、反抖动、头尾保护）
 
 **交付标准**：阿福能回忆过去对话、自动维护用户画像、长对话自动压缩。
 

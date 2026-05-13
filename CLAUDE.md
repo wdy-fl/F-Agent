@@ -1,5 +1,10 @@
 # F-Agent 项目规范
 
+## Git 仓库
+
+- 项目 git 仓库根目录：`/Users/wangdeyu/Desktop/agent/F-Agent`
+- 提交代码时必须 cd 到此目录，不要在父目录 `/Users/wangdeyu/Desktop/agent` 操作 git
+
 ## 环境要求
 
 - 使用 `python3` 命令，不要使用 `python`
