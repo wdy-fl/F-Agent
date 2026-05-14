@@ -89,7 +89,7 @@
 - Create: `cli/interface.py`
 - Modify: `main.py`
 
-- [ ] **Step 1:** 实现 `cli/interface.py`，prompt_toolkit 输入 + rich 输出
-- [ ] **Step 2:** 更新 `main.py` 完整入口集成
-- [ ] **Step 3:** 自测：`python3 main.py` 完整体验验证
-- [ ] **Step 4:** 提交 git
+- [x] **Step 1:** 实现 `cli/interface.py`，prompt_toolkit 输入 + rich 输出 ✅ 2026-05-14
+- [x] **Step 2:** 更新 `main.py` 完整入口集成 ✅ 2026-05-14
+- [x] **Step 3:** 自测：`python3 main.py` 完整体验验证 ✅ 2026-05-14（29 tests all passed）
+- [x] **Step 4:** 提交 git
