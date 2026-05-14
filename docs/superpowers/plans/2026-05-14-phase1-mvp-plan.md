@@ -62,10 +62,10 @@
 - Create: `db/session.py`
 - Create: `tests/test_session.py`
 
-- [ ] **Step 1:** 实现 `db/schema.py`，建表（sessions + messages，不含 FTS5）
-- [ ] **Step 2:** 实现 `db/session.py`，会话 CRUD + 消息 INSERT/SELECT
-- [ ] **Step 3:** 编写 SQLite 操作冒烟测试
-- [ ] **Step 4:** 自测验证，提交 git
+- [x] **Step 1:** 实现 `db/schema.py`，建表（sessions + messages，不含 FTS5） ✅ 2026-05-14
+- [x] **Step 2:** 实现 `db/session.py`，会话 CRUD + 消息 INSERT/SELECT ✅ 2026-05-14
+- [x] **Step 3:** 编写 SQLite 操作冒烟测试 ✅ 2026-05-14（8 tests passed）
+- [x] **Step 4:** 自测验证，提交 git
 
 ### Task 5: 完整 Agent 核心
 
