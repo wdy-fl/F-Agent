@@ -18,11 +18,11 @@
 - Create: `llm/client.py`
 - Create: `tests/test_llm_client.py`
 
-- [ ] **Step 1:** 创建 `pyproject.toml` 和 `requirements.txt`，声明依赖
-- [ ] **Step 2:** 实现 `config/settings.py`，YAML 配置加载 + 环境变量覆盖
-- [ ] **Step 3:** 实现 `llm/client.py`，OpenAI SDK 封装 + Token 计数
-- [ ] **Step 4:** 编写 LLM Client 冒烟测试
-- [ ] **Step 5:** 自测验证，提交 git
+- [x] **Step 1:** 创建 `pyproject.toml` 和 `requirements.txt`，声明依赖 ✅ 2026-05-14
+- [x] **Step 2:** 实现 `config/settings.py`，YAML 配置加载 + 环境变量覆盖 ✅ 2026-05-14
+- [x] **Step 3:** 实现 `llm/client.py`，OpenAI SDK 封装 + Token 计数 ✅ 2026-05-14
+- [x] **Step 4:** 编写 LLM Client 冒烟测试 ✅ 2026-05-14（4 tests passed）
+- [x] **Step 5:** 自测验证，提交 git ✅ 2026-05-14
 
 ### Task 2: Checkpoint — 最简主循环可运行
 
@@ -31,10 +31,10 @@
 - Create: `agent/prompt.py`
 - Create: `main.py`
 
-- [ ] **Step 1:** 实现 `agent/prompt.py`，基础系统提示词构建
-- [ ] **Step 2:** 实现 `agent/loop.py`，最简主循环（纯文本对话，流式输出）
-- [ ] **Step 3:** 实现 `main.py`，入口集成
-- [ ] **Step 4:** 自测：`python3 main.py` 能启动并完成一轮对话
+- [x] **Step 1:** 实现 `agent/prompt.py`，基础系统提示词构建 ✅ 2026-05-14
+- [x] **Step 2:** 实现 `agent/loop.py`，最简主循环（纯文本对话，流式输出） ✅ 2026-05-14
+- [x] **Step 3:** 实现 `main.py`，入口集成 ✅ 2026-05-14
+- [x] **Step 4:** 自测：`python3 main.py` 能启动并完成一轮对话 ✅ 2026-05-14（3 tests passed）
 - [ ] **Step 5:** 提交 git
 
 ### Task 3: 工具系统
