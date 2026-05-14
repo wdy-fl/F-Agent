@@ -9,6 +9,9 @@
 
 - 使用 `python3` 命令，不要使用 `python`
 - Python 3.11+
+- 虚拟环境：项目根目录下 `.venv/`，激活命令 `source .venv/bin/activate`
+- 运行测试前需先激活虚拟环境：`source .venv/bin/activate && python3 -m pytest`
+- 安装开发依赖：`source .venv/bin/activate && pip install -e ".[dev]"`
 
 ## 技术栈
 
