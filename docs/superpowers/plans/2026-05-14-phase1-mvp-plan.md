@@ -47,13 +47,13 @@
 - Create: `tools/web_search.py`
 - Create: `tests/test_tools.py`
 
-- [ ] **Step 1:** 实现 `tools/registry.py`，注册表 + 调度
-- [ ] **Step 2:** 实现 `tools/terminal.py`
-- [ ] **Step 3:** 实现 `tools/file_ops.py`（read_file, write_file, list_files）
-- [ ] **Step 4:** 实现 `tools/web_search.py`（web_search, web_fetch）
-- [ ] **Step 5:** 更新 `tools/__init__.py` 显式注册
-- [ ] **Step 6:** 编写工具调度冒烟测试
-- [ ] **Step 7:** 自测验证，提交 git
+- [x] **Step 1:** 实现 `tools/registry.py`，注册表 + 调度 ✅ 2026-05-14
+- [x] **Step 2:** 实现 `tools/terminal.py` ✅ 2026-05-14
+- [x] **Step 3:** 实现 `tools/file_ops.py`（read_file, write_file, list_files） ✅ 2026-05-14
+- [x] **Step 4:** 实现 `tools/web_search.py`（web_search, web_fetch） ✅ 2026-05-14
+- [x] **Step 5:** 更新 `tools/__init__.py` 显式注册 ✅ 2026-05-14
+- [x] **Step 6:** 编写工具调度冒烟测试 ✅ 2026-05-14（8 tests passed）
+- [x] **Step 7:** 自测验证，提交 git
 
 ### Task 4: 会话持久化（最小版）
 
