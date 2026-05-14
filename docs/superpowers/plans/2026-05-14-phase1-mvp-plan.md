@@ -75,13 +75,13 @@
 - Modify: `agent/prompt.py`
 - Modify: `main.py`
 
-- [ ] **Step 1:** 实现 `agent/budget.py`，预算控制 + 中断信号
-- [ ] **Step 2:** 扩展 `agent/loop.py`，加入工具执行 + 消息管理
-- [ ] **Step 3:** 扩展 `agent/prompt.py`，加入工具 schema
-- [ ] **Step 4:** 集成会话持久化到主循环
-- [ ] **Step 5:** 编写预算控制边界测试
-- [ ] **Step 6:** 自测：完整 Agent 循环可运行
-- [ ] **Step 7:** 提交 git
+- [x] **Step 1:** 实现 `agent/budget.py`，预算控制 + 中断信号 ✅ 2026-05-14
+- [x] **Step 2:** 扩展 `agent/loop.py`，加入工具执行 + 消息管理 ✅ 2026-05-14
+- [x] **Step 3:** 扩展 `agent/prompt.py`，加入工具 schema ✅ 2026-05-14
+- [x] **Step 4:** 集成会话持久化到主循环 ✅ 2026-05-14
+- [x] **Step 5:** 编写预算控制边界测试 ✅ 2026-05-14（6 tests in test_agent_full.py）
+- [x] **Step 6:** 自测：完整 Agent 循环可运行 ✅ 2026-05-14（29 tests all passed）
+- [x] **Step 7:** 提交 git
 
 ### Task 6: CLI 界面
 

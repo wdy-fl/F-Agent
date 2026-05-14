@@ -1,9 +1,14 @@
-"""Agent 主循环：迭代 LLM 调用 + 工具执行"""
+"""Agent 主循环：迭代 LLM 调用 + 工具执行 + 会话持久化"""
 
+import json
 import logging
-from typing import Any
+import uuid
+from typing import Any, Callable
 
+from agent.budget import IterationBudget
+from db.session import SessionDB
 from llm.client import LLMClient
+from tools.registry import registry
 
 logger = logging.getLogger(__name__)
 
@@ -11,10 +16,24 @@ logger = logging.getLogger(__name__)
 class AgentLoop:
     """Agent 主循环，驱动 LLM 与工具的交互"""
 
-    def __init__(self, llm: LLMClient, max_iterations: int = 50):
+    def __init__(
+        self,
+        llm: LLMClient,
+        max_iterations: int = 50,
+        session_db: SessionDB | None = None,
+        output_callback: Callable[[str], None] | None = None,
+    ):
         self.llm = llm
         self.max_iterations = max_iterations
+        self.session_db = session_db
+        self.output_callback = output_callback or self._default_output
         self.messages: list[dict[str, Any]] = []
+        self.session_id: str | None = None
+        self.budget = IterationBudget(max_iterations)
+
+    def _default_output(self, text: str) -> None:
+        """默认输出方法（简单 print）"""
+        print(text, end="", flush=True)
 
     def run(self, user_message: str, system_prompt: str) -> str:
         """运行一轮对话，返回最终回复文本
@@ -26,50 +45,78 @@ class AgentLoop:
         Returns:
             Agent 的最终文本回复
         """
+        # 初始化预算
+        self.budget.reset()
+
         # 初始化消息列表
         self.messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
         ]
 
-        iteration = 0
-        while iteration < self.max_iterations:
-            iteration += 1
-            logger.debug("Agent loop iteration %d/%d", iteration, self.max_iterations)
+        # 创建会话记录
+        if self.session_db:
+            self.session_id = str(uuid.uuid4())
+            self.session_db.create_session(
+                self.session_id,
+                self.llm.model,
+                system_prompt,
+                title=user_message[:50],
+            )
+            self.session_db.append_message(self.session_id, "user", content=user_message)
+
+        # 获取工具定义
+        tools = registry.get_definitions()
+
+        # 主循环
+        while self.budget.can_continue():
+            self.budget.consume()
+            logger.debug("Agent loop iteration, budget remaining: %d", self.budget.remaining)
 
             # 调用 LLM（流式）
-            response = self._call_llm_stream()
+            response = self._call_llm_stream(tools=tools if tools else None)
 
             # 无工具调用 → 返回最终回复
             if not response.get("tool_calls"):
-                return response.get("content", "")
+                result = response.get("content", "")
+                self._persist_assistant_message(response)
+                return result
 
-            # 有工具调用 → 当前 Checkpoint 不支持，直接返回
-            logger.warning("Tool calls received but not supported in minimal loop")
-            return response.get("content") or "（收到工具调用请求，但当前版本暂不支持工具执行）"
+            # 有工具调用 → 执行工具
+            self._persist_assistant_message(response)
+            tool_results = self._execute_tool_calls(response["tool_calls"])
+            self.messages.extend(tool_results)
+
+            # 持久化工具结果
+            if self.session_db and self.session_id:
+                for tr in tool_results:
+                    self.session_db.append_message(
+                        self.session_id,
+                        "tool",
+                        content=tr.get("content", ""),
+                        tool_call_id=tr.get("tool_call_id"),
+                    )
 
         # 预算耗尽
         logger.warning("Agent loop reached max iterations: %d", self.max_iterations)
         return self._grace_call()
 
-    def _call_llm_stream(self) -> dict[str, Any]:
+    def _call_llm_stream(self, tools: list[dict] | None = None) -> dict[str, Any]:
         """流式调用 LLM，实时输出内容，返回完整响应"""
         content_parts: list[str] = []
         tool_calls = None
         finish_reason = None
 
-        for event in self.llm.chat_stream(self.messages):
+        for event in self.llm.chat_stream(self.messages, tools=tools):
             if event["type"] == "content_delta":
                 content_parts.append(event["content"])
-                # 实时输出到终端（简单 print，后续由 CLI 层接管）
-                print(event["content"], end="", flush=True)
+                self.output_callback(event["content"])
             elif event["type"] == "done":
-                content_parts.append("")  # 确保内容完整
                 tool_calls = event.get("tool_calls")
                 finish_reason = event.get("finish_reason", "stop")
 
         full_content = "".join(content_parts)
-        print()  # 换行
+        self.output_callback("\n")
 
         # 构造助手消息并追加
         assistant_msg: dict[str, Any] = {"role": "assistant", "content": full_content}
@@ -83,6 +130,35 @@ class AgentLoop:
             "finish_reason": finish_reason,
         }
 
+    def _execute_tool_calls(self, tool_calls: list[dict]) -> list[dict[str, Any]]:
+        """执行工具调用列表
+
+        Args:
+            tool_calls: LLM 返回的 tool_calls
+
+        Returns:
+            工具结果消息列表
+        """
+        logger.info("Executing %d tool calls", len(tool_calls))
+        results = registry.dispatch_parallel(tool_calls)
+        for i, result in enumerate(results):
+            tool_name = tool_calls[i]["function"]["name"] if i < len(tool_calls) else "unknown"
+            logger.info("Tool %s result: %s", tool_name, result.get("content", "")[:100])
+        return results
+
+    def _persist_assistant_message(self, response: dict[str, Any]) -> None:
+        """持久化助手消息"""
+        if not self.session_db or not self.session_id:
+            return
+
+        self.session_db.append_message(
+            self.session_id,
+            "assistant",
+            content=response.get("content"),
+            tool_calls=response.get("tool_calls"),
+            finish_reason=response.get("finish_reason"),
+        )
+
     def _grace_call(self) -> str:
         """预算耗尽后的最后一次调用，让 LLM 产出最终回复"""
         logger.info("Performing grace call")
@@ -91,5 +167,12 @@ class AgentLoop:
             "content": "请总结当前进展并给出最终回复。",
         })
 
-        response = self._call_llm_stream()
+        if self.session_db and self.session_id:
+            self.session_db.append_message(
+                self.session_id, "user", content="请总结当前进展并给出最终回复。"
+            )
+
+        tools = registry.get_definitions()
+        response = self._call_llm_stream(tools=tools if tools else None)
+        self._persist_assistant_message(response)
         return response.get("content", "")

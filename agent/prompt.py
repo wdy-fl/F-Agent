@@ -2,6 +2,8 @@
 
 from datetime import datetime
 
+from tools.registry import registry
+
 AGENT_IDENTITY = """\
 你是阿福（F-Agent），一个具备对话记忆和技能自创能力的个人智能助手。
 
@@ -25,6 +27,21 @@ MEMORY_GUIDANCE = """\
 - 画像更新时合并而非覆盖，保持信息简洁
 """
 
+TOOL_USE_GUIDANCE = """\
+## 工具使用
+你有可用的工具来完成任务。当需要执行操作时，直接调用工具，不要只是描述你将要做什么。
+
+### 可用工具
+{tool_index}
+
+### 工具使用规则
+- 需要执行命令时使用 terminal 工具
+- 需要读写文件时使用 read_file / write_file 工具
+- 需要搜索信息时使用 web_search 工具
+- 多个独立的只读操作可以并行执行
+- 有副作用的操作（写入文件、执行命令）会顺序执行
+"""
+
 
 def build_system_prompt(
     include_memory_guidance: bool = False,
@@ -39,7 +56,8 @@ def build_system_prompt(
     parts = [AGENT_IDENTITY]
 
     if include_tools:
-        parts.append("\n## 工具使用\n你有可用的工具来完成任务。当需要执行操作时，直接调用工具，不要只是描述你将要做什么。")
+        tool_index = _build_tool_index()
+        parts.append(TOOL_USE_GUIDANCE.format(tool_index=tool_index))
 
     if include_memory_guidance:
         parts.append(MEMORY_GUIDANCE)
@@ -49,3 +67,18 @@ def build_system_prompt(
     parts.append(f"\n当前时间：{now}")
 
     return "\n".join(parts)
+
+
+def _build_tool_index() -> str:
+    """构建工具索引列表"""
+    definitions = registry.get_definitions()
+    if not definitions:
+        return "（暂无可用工具）"
+
+    lines = []
+    for defn in definitions:
+        func = defn.get("function", {})
+        name = func.get("name", "unknown")
+        desc = func.get("description", "")
+        lines.append(f"- **{name}**: {desc}")
+    return "\n".join(lines)
