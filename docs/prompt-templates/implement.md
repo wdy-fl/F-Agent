@@ -13,11 +13,14 @@
 - 虚拟环境：`source .venv/bin/activate`
 - 运行测试：`source .venv/bin/activate && python3 -m pytest`
 - 架构设计文档：`docs/ARCHITECTURE.md`
-- 开发 SOP：`docs/dev-sop.md`
 
 ## 接口契约
 
 {{interface_contract}}
+
+## 上下文快照
+
+{{context_snapshot}}
 
 ## 通用约束
 
