@@ -32,12 +32,22 @@
 git clone https://github.com/yourname/F-Agent.git
 cd F-Agent
 
-# 安装依赖
+# 创建虚拟环境并安装依赖
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 
-# 配置 API Key
-cp .env.example .env
-# 编辑 .env 填入你的 LLM API Key
+# 配置 API Key（二选一）
+# 方式一：环境变量
+export FAGENT_API_KEY=your-key
+# 方式二：配置文件
+mkdir -p ~/.fagent
+cat > ~/.fagent/config.yaml << 'EOF'
+llm:
+  api_key: "your-key"
+  base_url: ""          # 可选：自定义 API 端点（如 DeepSeek: https://api.deepseek.com）
+  model: "gpt-4o-mini"  # 模型名称
+EOF
 
 # 启动阿福
 python3 main.py
