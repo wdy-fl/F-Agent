@@ -58,8 +58,43 @@
 | 项目目标 | `docs/GOAL.md` | 项目愿景、学习目标、实现阶段、设计原则 |
 | 架构设计 | `docs/ARCHITECTURE.md` | 整体架构、模块划分、核心流程、数据存储 |
 | Agent 开发 SOP | `docs/dev-sop.md` | Agent 开发工作流规范，5原则 + 9环节完整闭环 |
+| 子 Agent Prompt 模板 | `docs/prompt-templates/` | 子 agent 分工的 prompt 模板，分配任务时读取并填充 |
 | 需求对齐与设计 | `docs/superpowers/specs/` | 需求澄清结论与设计方案文档 |
 | 任务规划与进度 | `docs/superpowers/plans/` | 任务分解、执行计划与进度状态 |
+
+## 子 Agent 分工规范
+
+开发过程中采用主 agent 统筹 + 子 agent 执行的分工模式，质量优先。
+
+### 分工原则
+
+| 角色 | 职责 | 适用场景 |
+|------|------|---------|
+| 主 agent | 规划、任务拆分、约束编写、进度更新、集成审查 | 所有规划与协调工作 |
+| `general-purpose` 子 agent | 具体模块实现 + 测试编写 | 新模块开发、独立文件实现 |
+| `Explore` 子 agent | 只读代码探索与信息调研 | 了解参考项目实现、搜索代码模式 |
+| `Plan` 子 agent | 架构设计与方案评估 | 复杂任务的方案设计 |
+| `code-reviewer` 子 agent | 代码审查 | 任务点完成后的质量检查 |
+
+### 任务分配流程
+
+1. 主 agent 拆分任务，确定每个子任务的目标文件和接口契约
+2. 读取对应的 prompt 模板文件，填充 `{{task_description}}` 和 `{{interface_contract}}` 等变量
+3. 调用 Agent 工具分配给子 agent 执行
+4. 子 agent 返回后，主 agent 审查实际代码变更（不信任子 agent 的口头报告）
+5. 主 agent 更新进度文档，询问用户是否提交 git commit
+
+### 任务粒度
+
+- 粒度为**一个模块文件 + 对应测试**，如"实现 tools/terminal.py + tests/test_terminal.py"
+- 不拆到单个函数级别（调度开销不值），也不大到整个子系统（上下文隔离失效）
+
+### 不使用子 agent 的场景
+
+- 规划和进度文档更新
+- 跨模块的集成修改（如修改 loop.py 后同步改 prompt.py）
+- 小改动（几行 fix）
+- git commit 操作
 
 ## 参考资源
 
