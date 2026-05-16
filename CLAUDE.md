@@ -60,7 +60,7 @@
 
 ## 参考资源
 
-- Hermes-Agent 源码：`/Users/wangdeyu/Desktop/agent/hermes-agent`
+- Hermes-Agent 源码：`../hermes-agent`
 - Hermes-Agent 核心文件：
   - `run_agent.py` — Agent 主循环
   - `model_tools.py` — 工具调度层
