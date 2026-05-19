@@ -9,6 +9,7 @@ build/
 workspace/
 .idea/
 .vscode/
+.claude/
 *.swp
 *.swo
 .DS_Store
