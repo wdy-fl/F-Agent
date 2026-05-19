@@ -81,14 +81,14 @@ def test_chat_stream():
     for text in ["你", "好", "！"]:
         chunk = MagicMock()
         chunk.choices = [MagicMock()]
-        chunk.choices[0].delta = MagicMock(content=text, tool_calls=None)
+        chunk.choices[0].delta = MagicMock(content=text, reasoning_content=None, tool_calls=None)
         chunk.choices[0].finish_reason = None
         chunks.append(chunk)
 
     # 结束 chunk
     end_chunk = MagicMock()
     end_chunk.choices = [MagicMock()]
-    end_chunk.choices[0].delta = MagicMock(content=None, tool_calls=None)
+    end_chunk.choices[0].delta = MagicMock(content=None, reasoning_content=None, tool_calls=None)
     end_chunk.choices[0].finish_reason = "stop"
     chunks.append(end_chunk)
 
@@ -153,6 +153,8 @@ def test_chat_stream_with_reasoning_content():
     assert done_event["content"] == "Hello"
     assert done_event.get("reasoning_content") == "Let me think"
     assert done_event.get("usage") == {"prompt_tokens": 12, "completion_tokens": 8}
+    assert client.total_input_tokens == 12
+    assert client.total_output_tokens == 8
 
 
 def test_chat_with_reasoning_content():

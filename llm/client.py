@@ -91,6 +91,8 @@ class LLMClient:
                     "prompt_tokens": chunk.usage.prompt_tokens,
                     "completion_tokens": chunk.usage.completion_tokens,
                 }
+                self._total_input_tokens += chunk.usage.prompt_tokens
+                self._total_output_tokens += chunk.usage.completion_tokens
 
             if not chunk.choices:
                 continue
@@ -145,17 +147,21 @@ class LLMClient:
                 return
 
         # 兜底：流异常结束
-        yield {
+        result_fallback: dict[str, Any] = {
             "type": "done",
             "finish_reason": "stop",
             "content": current_content,
-            "reasoning_content": current_reasoning if current_reasoning else None,
-            "tool_calls": [
+        }
+        if tool_calls_accum:
+            result_fallback["tool_calls"] = [
                 tool_calls_accum[i]
                 for i in sorted(tool_calls_accum.keys())
-            ] if tool_calls_accum else None,
-            "usage": usage,
-        }
+            ]
+        if current_reasoning:
+            result_fallback["reasoning_content"] = current_reasoning
+        if usage:
+            result_fallback["usage"] = usage
+        yield result_fallback
 
     def _parse_response(self, response) -> dict[str, Any]:
         """解析非流式响应为统一格式"""
