@@ -66,7 +66,6 @@ def _apply_env_overrides(config_dict: dict) -> dict:
     env_mapping = {
         "FAGENT_MODEL": ("llm", "model"),
         "FAGENT_BASE_URL": ("llm", "base_url"),
-        "FAGENT_API_KEY": ("llm", "api_key"),
         "FAGENT_CONTEXT_WINDOW": ("llm", "context_window"),
         "FAGENT_MAX_ITERATIONS": ("llm", "max_iterations"),
         "FAGENT_DB_PATH": ("db_path",),

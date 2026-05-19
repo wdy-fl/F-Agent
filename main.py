@@ -16,9 +16,7 @@ def main():
 
     # 验证 API Key
     if not config.llm.api_key:
-        print("错误：未配置 API Key。请通过以下方式之一设置：")
-        print("  1. 环境变量：export FAGENT_API_KEY=your-key")
-        print("  2. 配置文件：~/.fagent/config.yaml 中设置 llm.api_key")
+        print("错误：未配置 API Key。请在 workspace/config.yaml 中设置 llm.api_key")
         sys.exit(1)
 
     # 确保配置目录

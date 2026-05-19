@@ -37,12 +37,9 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# 配置 API Key（二选一）
-# 方式一：环境变量
-export FAGENT_API_KEY=your-key
-# 方式二：配置文件
-mkdir -p ~/.fagent
-cat > ~/.fagent/config.yaml << 'EOF'
+# 配置 API Key
+mkdir -p workspace
+cat > workspace/config.yaml << 'EOF'
 llm:
   api_key: "your-key"
   base_url: ""          # 可选：自定义 API 端点（如 DeepSeek: https://api.deepseek.com）
