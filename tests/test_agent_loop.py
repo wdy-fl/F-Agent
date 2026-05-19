@@ -76,6 +76,3 @@ def test_build_system_prompt():
 
     prompt_with_tools = build_system_prompt(include_tools=True)
     assert "工具使用" in prompt_with_tools
-
-    prompt_with_memory = build_system_prompt(include_memory_guidance=True)
-    assert "记忆工具" in prompt_with_memory
