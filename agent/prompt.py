@@ -37,7 +37,11 @@ TOOL_USE_GUIDANCE = """\
 def build_system_prompt(
     include_tools: bool = False,
 ) -> str:
-    """构建系统提示词"""
+    """构建系统提示词
+
+    Args:
+        include_tools: 是否包含工具使用指引
+    """
     parts = [AGENT_IDENTITY]
 
     if include_tools:
