@@ -7,7 +7,7 @@ from pathlib import Path
 import yaml
 
 
-DEFAULT_CONFIG_DIR = Path.home() / ".fagent"
+DEFAULT_CONFIG_DIR = Path(__file__).parent.parent / "workspace"
 DEFAULT_CONFIG_PATH = DEFAULT_CONFIG_DIR / "config.yaml"
 DEFAULT_DB_PATH = DEFAULT_CONFIG_DIR / "state.db"
 DEFAULT_USER_PROFILE_PATH = DEFAULT_CONFIG_DIR / "USER.md"

@@ -6,6 +6,7 @@ __pycache__/
 dist/
 build/
 .env
+workspace/
 .idea/
 .vscode/
 *.swp
