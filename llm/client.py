@@ -72,17 +72,26 @@ class LLMClient:
             "messages": messages,
             "temperature": temperature or self.config.temperature,
             "stream": True,
+            "stream_options": {"include_usage": True},
         }
         if tools:
             kwargs["tools"] = tools
 
         stream = self.client.chat.completions.create(**kwargs)
 
-        # 流式拼接 tool_calls
         tool_calls_accum: dict[int, dict[str, Any]] = {}
         current_content = ""
+        current_reasoning = ""
+        usage = None
 
         for chunk in stream:
+            # 捕获 usage（DeepSeek 流式最后一个 chunk 在顶层带 usage）
+            if hasattr(chunk, 'usage') and chunk.usage:
+                usage = {
+                    "prompt_tokens": chunk.usage.prompt_tokens,
+                    "completion_tokens": chunk.usage.completion_tokens,
+                }
+
             if not chunk.choices:
                 continue
 
@@ -92,6 +101,10 @@ class LLMClient:
             if delta.content:
                 current_content += delta.content
                 yield {"type": "content_delta", "content": delta.content}
+
+            # reasoning_content 增量拼接
+            if getattr(delta, 'reasoning_content', None):
+                current_reasoning += delta.reasoning_content
 
             # tool_calls 增量拼接
             if delta.tool_calls:
@@ -124,7 +137,10 @@ class LLMClient:
                         tool_calls_accum[i]
                         for i in sorted(tool_calls_accum.keys())
                     ]
-                # Token 统计（流式不提供 usage）
+                if current_reasoning:
+                    result["reasoning_content"] = current_reasoning
+                if usage:
+                    result["usage"] = usage
                 yield result
                 return
 
@@ -133,10 +149,12 @@ class LLMClient:
             "type": "done",
             "finish_reason": "stop",
             "content": current_content,
+            "reasoning_content": current_reasoning if current_reasoning else None,
             "tool_calls": [
                 tool_calls_accum[i]
                 for i in sorted(tool_calls_accum.keys())
             ] if tool_calls_accum else None,
+            "usage": usage,
         }
 
     def _parse_response(self, response) -> dict[str, Any]:
@@ -148,6 +166,9 @@ class LLMClient:
             "finish_reason": choice.finish_reason,
             "content": message.content or "",
         }
+
+        if getattr(message, 'reasoning_content', None):
+            result["reasoning_content"] = message.reasoning_content
 
         if message.tool_calls:
             result["tool_calls"] = [
