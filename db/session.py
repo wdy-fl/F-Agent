@@ -197,3 +197,43 @@ class SessionDB:
                 api_msg["tool_call_id"] = msg["tool_call_id"]
             result.append(api_msg)
         return result
+
+    def search_messages(
+        self,
+        query: str,
+        limit: int = 5,
+        session_id: str | None = None,
+    ) -> list[dict]:
+        """FTS5 全文搜索历史消息
+
+        Args:
+            query: 搜索关键词
+            limit: 最大返回条数
+            session_id: 可选，限定在某会话内搜索
+
+        Returns:
+            按相关性排序的消息列表，每条含 session_id、role、content、rank
+        """
+        try:
+            if session_id:
+                cur = self.conn.execute(
+                    """SELECT m.*, rank FROM messages_fts f
+                       JOIN messages m ON f.rowid = m.id
+                       WHERE messages_fts MATCH ? AND m.session_id = ?
+                       ORDER BY rank
+                       LIMIT ?""",
+                    (query, session_id, limit),
+                )
+            else:
+                cur = self.conn.execute(
+                    """SELECT m.*, rank FROM messages_fts f
+                       JOIN messages m ON f.rowid = m.id
+                       WHERE messages_fts MATCH ?
+                       ORDER BY rank
+                       LIMIT ?""",
+                    (query, limit),
+                )
+            return [dict(row) for row in cur.fetchall()]
+        except sqlite3.OperationalError:
+            logger.warning("FTS5 search failed for query: %s", query, exc_info=True)
+            return []

@@ -28,6 +28,11 @@
 
 **测试:** FTS5 搜索准确性测试（插入消息 → 搜索 → 验证召回排序）
 
+- [x] **Step 1:** 修改 `db/schema.py`，SCHEMA_VERSION 升到 2，增加 FTS5 虚拟表和触发器，实现 v1→v2 迁移 ✅ 2026-05-20
+- [x] **Step 2:** 修改 `db/session.py`，增加 `search_messages` 方法 ✅ 2026-05-20
+- [x] **Step 3:** 编写 FTS5 搜索测试（5 tests：基本搜索/会话过滤/无匹配/非法查询/迁移） ✅ 2026-05-20
+- [x] **Step 4:** 自测验证（42 tests all passed） ✅ 2026-05-20
+
 ---
 
 ### Task 2: 上下文围栏

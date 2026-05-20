@@ -168,3 +168,98 @@ def test_reasoning_content_roundtrip(tmp_path):
     assert conv[0].get("tool_calls") is not None
     assert "reasoning_content" not in conv[1]
     db.close()
+
+
+# ---- FTS5 全文搜索测试 ----
+
+
+def test_fts5_search_basic(tmp_path):
+    """测试 FTS5 基本搜索召回"""
+    db = SessionDB(tmp_path / "test.db")
+
+    db.create_session("sess-a", "deepseek-v4-pro", "test", title="搜索测试")
+    db.append_message("sess-a", "user", content="我喜欢用 Python 写代码")
+    db.append_message("sess-a", "assistant", content="Python 是一门很好的编程语言")
+    db.append_message("sess-a", "user", content="今天天气不错")
+
+    results = db.search_messages("Python")
+    assert len(results) == 2
+    # 相关性排序：两条 Python 相关消息应排在前面
+    assert all("Python" in r["content"] for r in results)
+    db.close()
+
+
+def test_fts5_search_with_session_filter(tmp_path):
+    """测试 FTS5 搜索时限定会话"""
+    db = SessionDB(tmp_path / "test.db")
+
+    db.create_session("sess-a", "deepseek-v4-pro", "test")
+    db.append_message("sess-a", "user", content="Python 异步编程")
+    db.create_session("sess-b", "deepseek-v4-pro", "test")
+    db.append_message("sess-b", "user", content="Python 装饰器")
+
+    results = db.search_messages("Python", session_id="sess-a")
+    assert len(results) == 1
+    assert results[0]["content"] == "Python 异步编程"
+    assert results[0]["session_id"] == "sess-a"
+    db.close()
+
+
+def test_fts5_search_no_match(tmp_path):
+    """测试 FTS5 无匹配结果"""
+    db = SessionDB(tmp_path / "test.db")
+
+    db.create_session("sess-a", "deepseek-v4-pro", "test")
+    db.append_message("sess-a", "user", content="Hello world")
+
+    results = db.search_messages("nonexistent_xyz")
+    assert results == []
+    db.close()
+
+
+def test_fts5_search_invalid_query(tmp_path):
+    """测试 FTS5 非法查询语法：返回空列表，不抛异常"""
+    db = SessionDB(tmp_path / "test.db")
+
+    db.create_session("sess-a", "deepseek-v4-pro", "test")
+    db.append_message("sess-a", "user", content="test")
+
+    # FTS5 中未配对的引号会导致语法错误
+    results = db.search_messages('"unclosed quote')
+    assert results == []
+    db.close()
+
+
+def test_fts5_migration_from_v1(tmp_path):
+    """测试从 v1 数据库迁移到 v2：已有消息应被索引"""
+    import sqlite3
+    from db.schema import init_db, SCHEMA_VERSION
+
+    db_path = tmp_path / "migrate.db"
+    # 手动创建 v1 schema（无 FTS5）
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY)")
+    conn.execute("""CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT, role TEXT, content TEXT
+    )""")
+    conn.execute("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)")
+    conn.execute("INSERT INTO schema_version (version) VALUES (1)")
+    conn.execute("INSERT INTO sessions (id) VALUES ('sess-1')")
+    conn.execute("INSERT INTO messages (session_id, role, content) VALUES ('sess-1', 'user', 'Hello from v1')")
+    conn.execute("INSERT INTO messages (session_id, role, content) VALUES ('sess-1', 'assistant', 'Hi there')")
+    conn.commit()
+    conn.close()
+
+    # 用 SessionDB 打开，应触发迁移
+    db = SessionDB(db_path)
+    results = db.search_messages("Hello")
+    assert len(results) == 1
+    assert results[0]["content"] == "Hello from v1"
+
+    # 验证版本号已更新
+    cur = db.conn.execute("SELECT version FROM schema_version")
+    assert cur.fetchone()[0] == SCHEMA_VERSION
+    db.close()
