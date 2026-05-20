@@ -5,7 +5,9 @@ import logging
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import FileHistory
 from rich.console import Console
+from rich.live import Live
 from rich.markdown import Markdown
+from rich.text import Text
 
 from agent.loop import AgentLoop
 from agent.prompt import build_system_prompt
@@ -46,7 +48,7 @@ class CLIInterface:
 
         # 流式输出状态
         self._stream_buffer = ""
-        self._is_streaming = False
+        self._live: Live | None = None
 
         # 中断标志
         self._interrupted = False
@@ -73,37 +75,38 @@ class CLIInterface:
 
             # 运行 Agent
             self._interrupted = False
-            self.console.print("阿福: ", end="", style="bold green")
+            self.console.print("阿福: ", style="bold green")
             self._stream_buffer = ""
-            self._is_streaming = True
 
             try:
-                result = self.agent.run(user_input, self.system_prompt)
-            except KeyboardInterrupt:
-                self.agent.budget.interrupt()
-                self.console.print("\n[已中断]", style="yellow")
-                self._is_streaming = False
-                continue
+                with Live(Text(""), console=self.console, transient=False, refresh_per_second=15) as live:
+                    self._live = live
+                    try:
+                        result = self.agent.run(user_input, self.system_prompt)
+                    except KeyboardInterrupt:
+                        self.agent.budget.interrupt()
+                        live.stop()
+                        self.console.print("[已中断]", style="yellow")
+                        self._live = None
+                        continue
 
-            self._is_streaming = False
-            if self._stream_buffer:
-                self.console.print()  # 确保换行
-            elif result:
-                # 如果没有流式输出但有最终结果，用 Markdown 渲染
-                self.console.print()
-                self.console.print(Markdown(result))
+                    if result:
+                        live.update(Markdown(result))
+            except Exception:
+                self._live = None
+                raise
+            finally:
+                self._live = None
 
         self.session_db.close()
 
     def _on_stream_delta(self, text: str) -> None:
-        """流式输出回调"""
+        """流式输出回调：将文本增量刷新到 Live 区域"""
         if text == "\n":
-            self.console.print()
-            self._stream_buffer = ""
             return
-
-        self.console.print(text, end="")
         self._stream_buffer += text
+        if self._live:
+            self._live.update(Text(self._stream_buffer))
 
     def _handle_command(self, command: str) -> bool:
         """处理斜杠命令
