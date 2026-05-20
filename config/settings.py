@@ -18,8 +18,8 @@ DEFAULT_LOG_DIR = DEFAULT_CONFIG_DIR / "logs"
 @dataclass
 class LLMConfig:
     """LLM 相关配置"""
-    model: str = "gpt-4o-mini"
-    base_url: str | None = None
+    model: str = "deepseek-v4-pro"
+    base_url: str | None = "https://api.deepseek.com"
     api_key: str = ""
     context_window: int = 128000
     max_iterations: int = 50
