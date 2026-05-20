@@ -51,6 +51,10 @@
 
 **测试:** 围栏注入/剥离测试（正常注入、嵌套标签、跨 chunk 剥离）
 
+- [x] **Step 1:** 创建 `memory/context_fence.py`，实现 `inject_context` 和 `strip_context` ✅ 2026-05-20
+- [x] **Step 2:** 编写测试（8 tests：注入/空注入/剥离/无标签/标签不完整/多行记忆/前置文本） ✅ 2026-05-20
+- [x] **Step 3:** 自测验证（50 tests all passed） ✅ 2026-05-20
+
 ---
 
 ### Task 3: 记忆管理器
