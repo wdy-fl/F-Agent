@@ -15,6 +15,8 @@ from config.settings import AppConfig, ensure_config_dir
 from db.session import SessionDB
 from llm.client import LLMClient
 from memory.manager import MemoryManager
+from memory.user_profile import UserProfileManager
+from tools.memory import set_managers
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,18 @@ class CLIInterface:
             self.session_db,
             config.user_profile_path,
             llm=self.llm,
+        )
+
+        # 创建用户画像管理器
+        self.profile_manager = UserProfileManager(
+            config.user_profile_path,
+            llm=self.llm,
+        )
+
+        # 注入到 memory 工具
+        set_managers(
+            memory_manager=self.memory_manager,
+            profile_manager=self.profile_manager,
         )
 
         # 创建 Agent 循环

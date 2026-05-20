@@ -143,6 +143,12 @@
 
 **测试:** 画像更新流程测试（mock LLM → 写入新观察 → 验证合并结果）、memory 工具注册和调用测试
 
+- [x] **Step 1:** 创建 `memory/user_profile.py`，实现 UserProfileManager（LLM 驱动画像合并 + 长度截断 + 失败降级） ✅ 2026-05-20
+- [x] **Step 2:** 创建 `tools/memory.py`，注册 memory 工具（search/save/update_profile 三个 action） ✅ 2026-05-20
+- [x] **Step 3:** 修改 `tools/__init__.py` 和 `cli/interface.py`，完成工具注册和依赖注入 ✅ 2026-05-20
+- [x] **Step 4:** 编写测试（17 tests：画像读写/LLM 更新/截断/无 LLM/失败降级 + 工具注册/handler 各 action） ✅ 2026-05-20
+- [x] **Step 5:** 自测验证（76 tests all passed） ✅ 2026-05-20
+
 ---
 
 ### Task 6: 上下文压缩
