@@ -6,6 +6,14 @@ from config.settings import LLMConfig
 from llm.client import LLMClient
 
 
+def test_default_llm_config_uses_deepseek():
+    """测试默认 LLM 配置使用 DeepSeek 模型和 API 地址"""
+    config = LLMConfig()
+
+    assert config.model == "deepseek-v4-pro"
+    assert config.base_url == "https://api.deepseek.com"
+
+
 def _make_mock_response(content: str | None = "你好", tool_calls=None, finish_reason="stop", usage=None):
     """构造 mock 的 OpenAI 响应对象"""
     message = MagicMock()
@@ -30,7 +38,7 @@ def test_chat_basic():
         usage=MagicMock(prompt_tokens=10, completion_tokens=5),
     )
 
-    config = LLMConfig(api_key="sk-test", model="gpt-4o-mini")
+    config = LLMConfig(api_key="sk-test", model="deepseek-v4-pro")
     client = LLMClient(config)
 
     with patch.object(client.client.chat.completions, "create", return_value=mock_response):

@@ -1,6 +1,5 @@
 """Agent 主循环：迭代 LLM 调用 + 工具执行 + 会话持久化"""
 
-import json
 import logging
 import uuid
 from typing import Any, Callable
@@ -35,6 +34,20 @@ class AgentLoop:
         """默认输出方法（简单 print）"""
         print(text, end="", flush=True)
 
+    def _ensure_conversation_started(self, system_prompt: str, first_user_message: str) -> None:
+        """初始化当前 AgentLoop 生命周期内的连续对话"""
+        if not self.messages:
+            self.messages.append({"role": "system", "content": system_prompt})
+
+        if self.session_db and not self.session_id:
+            self.session_id = str(uuid.uuid4())
+            self.session_db.create_session(
+                self.session_id,
+                self.llm.model,
+                system_prompt,
+                title=first_user_message[:50],
+            )
+
     def run(self, user_message: str, system_prompt: str) -> str:
         """运行一轮对话，返回最终回复文本
 
@@ -48,21 +61,12 @@ class AgentLoop:
         # 初始化预算
         self.budget.reset()
 
-        # 初始化消息列表
-        self.messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ]
+        self._ensure_conversation_started(system_prompt, user_message)
 
-        # 创建会话记录
-        if self.session_db:
-            self.session_id = str(uuid.uuid4())
-            self.session_db.create_session(
-                self.session_id,
-                self.llm.model,
-                system_prompt,
-                title=user_message[:50],
-            )
+        user_msg = {"role": "user", "content": user_message}
+        self.messages.append(user_msg)
+
+        if self.session_db and self.session_id:
             self.session_db.append_message(self.session_id, "user", content=user_message)
             self.session_db.update_session_stats(self.session_id, message_count=1)
 

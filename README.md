@@ -42,8 +42,8 @@ mkdir -p workspace
 cat > workspace/config.yaml << 'EOF'
 llm:
   api_key: "your-key"
-  base_url: ""          # 可选：自定义 API 端点（如 DeepSeek: https://api.deepseek.com）
-  model: "gpt-4o-mini"  # 模型名称
+  base_url: "https://api.deepseek.com"
+  model: "deepseek-v4-pro"
 EOF
 
 # 启动阿福

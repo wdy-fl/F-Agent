@@ -1,5 +1,6 @@
 """预算控制和完整 Agent 循环测试"""
 
+from copy import deepcopy
 from unittest.mock import patch
 
 from agent.budget import IterationBudget
@@ -116,3 +117,97 @@ def test_agent_loop_with_session_persistence(tmp_path):
     messages = session_db.get_messages(agent.session_id)
     assert len(messages) >= 2  # user + assistant
     session_db.close()
+
+
+def test_agent_loop_preserves_context_between_runs():
+    """测试同一个 AgentLoop 的多次 run 会保留上一轮上下文"""
+    config = LLMConfig(api_key="sk-test")
+    llm = LLMClient(config)
+    agent = AgentLoop(llm, max_iterations=10, output_callback=lambda t: None)
+
+    captured_messages = []
+
+    def fake_chat_stream(messages, tools=None):
+        captured_messages.append(deepcopy(messages))
+        if len(captured_messages) == 1:
+            return iter([
+                {"type": "content_delta", "content": "好的，当当大人"},
+                {"type": "done", "finish_reason": "stop", "content": "好的，当当大人", "tool_calls": None},
+            ])
+        return iter([
+            {"type": "content_delta", "content": "知道，您是王当当"},
+            {"type": "done", "finish_reason": "stop", "content": "知道，您是王当当", "tool_calls": None},
+        ])
+
+    with patch.object(llm, "chat_stream", side_effect=fake_chat_stream):
+        agent.run("我的名字是王当当，你可以叫我当当大人", "You are a helper")
+        result = agent.run("现在你知道我是谁了吗？", "You are a helper")
+
+    assert result == "知道，您是王当当"
+    assert len(captured_messages) == 2
+    second_call_messages = captured_messages[1]
+    assert second_call_messages == [
+        {"role": "system", "content": "You are a helper"},
+        {"role": "user", "content": "我的名字是王当当，你可以叫我当当大人"},
+        {"role": "assistant", "content": "好的，当当大人"},
+        {"role": "user", "content": "现在你知道我是谁了吗？"},
+    ]
+
+
+def test_agent_loop_reuses_session_across_runs(tmp_path):
+    """测试同一个 AgentLoop 的多次 run 写入同一个 SQLite session"""
+    config = LLMConfig(api_key="sk-test")
+    llm = LLMClient(config)
+    session_db = SessionDB(tmp_path / "test.db")
+    agent = AgentLoop(llm, max_iterations=10, session_db=session_db, output_callback=lambda t: None)
+
+    call_count = 0
+
+    def fake_chat_stream(messages, tools=None):
+        nonlocal call_count
+        call_count += 1
+        content = f"回复{call_count}"
+        return iter([
+            {"type": "content_delta", "content": content},
+            {"type": "done", "finish_reason": "stop", "content": content, "tool_calls": None},
+        ])
+
+    with patch.object(llm, "chat_stream", side_effect=fake_chat_stream):
+        agent.run("第一轮", "You are a helper")
+        first_session_id = agent.session_id
+        agent.run("第二轮", "You are a helper")
+
+    assert first_session_id is not None
+    assert agent.session_id == first_session_id
+
+    sessions = session_db.list_sessions(limit=10)
+    assert len(sessions) == 1
+
+    messages = session_db.get_messages(first_session_id)
+    assert [(m["role"], m["content"]) for m in messages] == [
+        ("user", "第一轮"),
+        ("assistant", "回复1"),
+        ("user", "第二轮"),
+        ("assistant", "回复2"),
+    ]
+    session_db.close()
+
+
+def test_agent_loop_keeps_single_system_prompt_across_runs():
+    """测试连续 run 不会重复追加 system prompt"""
+    config = LLMConfig(api_key="sk-test")
+    llm = LLMClient(config)
+    agent = AgentLoop(llm, max_iterations=10, output_callback=lambda t: None)
+
+    def fake_chat_stream(messages, tools=None):
+        return iter([
+            {"type": "content_delta", "content": "ok"},
+            {"type": "done", "finish_reason": "stop", "content": "ok", "tool_calls": None},
+        ])
+
+    with patch.object(llm, "chat_stream", side_effect=fake_chat_stream):
+        agent.run("第一轮", "You are a helper")
+        agent.run("第二轮", "You are a helper")
+
+    system_messages = [m for m in agent.messages if m["role"] == "system"]
+    assert system_messages == [{"role": "system", "content": "You are a helper"}]

@@ -7,12 +7,12 @@ def test_create_and_get_session(tmp_path):
     """测试创建和查询会话"""
     db = SessionDB(tmp_path / "test.db")
 
-    db.create_session("sess-1", "gpt-4o-mini", "You are a helper", title="测试会话")
+    db.create_session("sess-1", "deepseek-v4-pro", "You are a helper", title="测试会话")
     session = db.get_session("sess-1")
 
     assert session is not None
     assert session["id"] == "sess-1"
-    assert session["model"] == "gpt-4o-mini"
+    assert session["model"] == "deepseek-v4-pro"
     assert session["title"] == "测试会话"
     db.close()
 
@@ -21,7 +21,7 @@ def test_end_session(tmp_path):
     """测试结束会话"""
     db = SessionDB(tmp_path / "test.db")
 
-    db.create_session("sess-2", "gpt-4o-mini", "test")
+    db.create_session("sess-2", "deepseek-v4-pro", "test")
     db.end_session("sess-2")
 
     session = db.get_session("sess-2")
@@ -34,7 +34,7 @@ def test_update_session_stats(tmp_path):
     """测试更新会话统计"""
     db = SessionDB(tmp_path / "test.db")
 
-    db.create_session("sess-3", "gpt-4o-mini", "test")
+    db.create_session("sess-3", "deepseek-v4-pro", "test")
     db.update_session_stats("sess-3", message_count=3, input_tokens=100, output_tokens=50)
 
     session = db.get_session("sess-3")
@@ -48,7 +48,7 @@ def test_append_and_get_messages(tmp_path):
     """测试追加和查询消息"""
     db = SessionDB(tmp_path / "test.db")
 
-    db.create_session("sess-4", "gpt-4o-mini", "test")
+    db.create_session("sess-4", "deepseek-v4-pro", "test")
     db.append_message("sess-4", "user", content="你好")
     db.append_message("sess-4", "assistant", content="你好！我是阿福。")
 
@@ -64,7 +64,7 @@ def test_messages_with_tool_calls(tmp_path):
     """测试带工具调用的消息存储"""
     db = SessionDB(tmp_path / "test.db")
 
-    db.create_session("sess-5", "gpt-4o-mini", "test")
+    db.create_session("sess-5", "deepseek-v4-pro", "test")
     db.append_message(
         "sess-5",
         "assistant",
@@ -94,7 +94,7 @@ def test_get_messages_as_conversation(tmp_path):
     """测试获取 OpenAI 格式的对话消息"""
     db = SessionDB(tmp_path / "test.db")
 
-    db.create_session("sess-6", "gpt-4o-mini", "You are a helper")
+    db.create_session("sess-6", "deepseek-v4-pro", "You are a helper")
     db.append_message("sess-6", "user", content="列出文件")
     db.append_message(
         "sess-6",
@@ -125,7 +125,7 @@ def test_list_sessions(tmp_path):
     db = SessionDB(tmp_path / "test.db")
 
     for i in range(3):
-        db.create_session(f"sess-{i}", "gpt-4o-mini", "test", title=f"会话{i}")
+        db.create_session(f"sess-{i}", "deepseek-v4-pro", "test", title=f"会话{i}")
 
     sessions = db.list_sessions()
     assert len(sessions) == 3
