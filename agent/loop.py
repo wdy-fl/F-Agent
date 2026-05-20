@@ -64,6 +64,7 @@ class AgentLoop:
                 title=user_message[:50],
             )
             self.session_db.append_message(self.session_id, "user", content=user_message)
+            self.session_db.update_session_stats(self.session_id, message_count=1)
 
         # 获取工具定义
         tools = registry.get_definitions()
@@ -75,6 +76,16 @@ class AgentLoop:
 
             # 调用 LLM（流式）
             response = self._call_llm_stream(tools=tools if tools else None)
+
+            # 更新 token 统计
+            if self.session_db and self.session_id:
+                usage = response.get("usage")
+                if usage:
+                    self.session_db.update_session_stats(
+                        self.session_id,
+                        input_tokens=usage.get("prompt_tokens", 0),
+                        output_tokens=usage.get("completion_tokens", 0),
+                    )
 
             # 无工具调用 → 返回最终回复
             if not response.get("tool_calls"):
@@ -96,6 +107,11 @@ class AgentLoop:
                         content=tr.get("content", ""),
                         tool_call_id=tr.get("tool_call_id"),
                     )
+                    self.session_db.update_session_stats(self.session_id, message_count=1)
+                self.session_db.update_session_stats(
+                    self.session_id,
+                    tool_call_count=len(response["tool_calls"]),
+                )
 
         # 预算耗尽
         logger.warning("Agent loop reached max iterations: %d", self.max_iterations)
@@ -106,6 +122,8 @@ class AgentLoop:
         content_parts: list[str] = []
         tool_calls = None
         finish_reason = None
+        reasoning_content = None
+        usage = None
 
         for event in self.llm.chat_stream(self.messages, tools=tools):
             if event["type"] == "content_delta":
@@ -114,6 +132,8 @@ class AgentLoop:
             elif event["type"] == "done":
                 tool_calls = event.get("tool_calls")
                 finish_reason = event.get("finish_reason", "stop")
+                reasoning_content = event.get("reasoning_content")
+                usage = event.get("usage")
 
         full_content = "".join(content_parts)
         self.output_callback("\n")
@@ -122,13 +142,21 @@ class AgentLoop:
         assistant_msg: dict[str, Any] = {"role": "assistant", "content": full_content}
         if tool_calls:
             assistant_msg["tool_calls"] = tool_calls
+        if reasoning_content:
+            assistant_msg["reasoning_content"] = reasoning_content
         self.messages.append(assistant_msg)
 
-        return {
+        result: dict[str, Any] = {
             "content": full_content,
             "tool_calls": tool_calls,
             "finish_reason": finish_reason,
         }
+        if reasoning_content:
+            result["reasoning_content"] = reasoning_content
+        if usage:
+            result["usage"] = usage
+
+        return result
 
     def _execute_tool_calls(self, tool_calls: list[dict]) -> list[dict[str, Any]]:
         """执行工具调用列表
@@ -151,13 +179,19 @@ class AgentLoop:
         if not self.session_db or not self.session_id:
             return
 
+        kwargs: dict[str, Any] = {
+            "content": response.get("content"),
+            "tool_calls": response.get("tool_calls"),
+            "finish_reason": response.get("finish_reason"),
+        }
+        if response.get("reasoning_content"):
+            kwargs["reasoning_content"] = response["reasoning_content"]
         self.session_db.append_message(
             self.session_id,
             "assistant",
-            content=response.get("content"),
-            tool_calls=response.get("tool_calls"),
-            finish_reason=response.get("finish_reason"),
+            **kwargs,
         )
+        self.session_db.update_session_stats(self.session_id, message_count=1)
 
     def _grace_call(self) -> str:
         """预算耗尽后的最后一次调用，让 LLM 产出最终回复"""
@@ -171,8 +205,19 @@ class AgentLoop:
             self.session_db.append_message(
                 self.session_id, "user", content="请总结当前进展并给出最终回复。"
             )
+            self.session_db.update_session_stats(self.session_id, message_count=1)
 
         tools = registry.get_definitions()
         response = self._call_llm_stream(tools=tools if tools else None)
+
+        if self.session_db and self.session_id:
+            usage = response.get("usage")
+            if usage:
+                self.session_db.update_session_stats(
+                    self.session_id,
+                    input_tokens=usage.get("prompt_tokens", 0),
+                    output_tokens=usage.get("completion_tokens", 0),
+                )
+
         self._persist_assistant_message(response)
         return response.get("content", "")

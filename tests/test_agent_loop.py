@@ -68,6 +68,24 @@ def test_agent_loop_tool_calls_execute():
     assert any(msg.get("role") == "tool" for msg in agent.messages)
 
 
+def test_agent_loop_preserves_reasoning_content():
+    """测试 reasoning_content 在 assistant 消息中被保留"""
+    config = LLMConfig(api_key="sk-test")
+    llm = LLMClient(config)
+    agent = AgentLoop(llm, max_iterations=10, output_callback=lambda t: None)
+
+    events = _make_stream_events(content="Hello")
+    # 手动注入 reasoning_content 到 done 事件
+    events[-1]["reasoning_content"] = "I should greet the user"
+
+    with patch.object(llm, "chat_stream", return_value=iter(events)):
+        agent.run("Hi", build_system_prompt())
+
+    assistant_msgs = [m for m in agent.messages if m["role"] == "assistant"]
+    assert len(assistant_msgs) == 1
+    assert assistant_msgs[0].get("reasoning_content") == "I should greet the user"
+
+
 def test_build_system_prompt():
     """测试系统提示词构建"""
     prompt = build_system_prompt()
