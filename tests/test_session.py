@@ -138,3 +138,33 @@ def test_nonexistent_session(tmp_path):
     session = db.get_session("nonexistent")
     assert session is None
     db.close()
+
+
+def test_reasoning_content_roundtrip(tmp_path):
+    """测试 reasoning_content 的存储和回传"""
+    db = SessionDB(tmp_path / "test.db")
+    db.create_session("sess-7", "deepseek-v4-pro", "test")
+
+    db.append_message(
+        "sess-7",
+        "assistant",
+        content="Hello",
+        reasoning_content="Let me think about this",
+        tool_calls=[{
+            "id": "call_1",
+            "type": "function",
+            "function": {"name": "terminal", "arguments": '{"command": "ls"}'},
+        }],
+    )
+    db.append_message(
+        "sess-7",
+        "user",
+        content="What files?",
+    )
+
+    conv = db.get_messages_as_conversation("sess-7")
+    assert len(conv) == 2
+    assert conv[0].get("reasoning_content") == "Let me think about this"
+    assert conv[0].get("tool_calls") is not None
+    assert "reasoning_content" not in conv[1]
+    db.close()

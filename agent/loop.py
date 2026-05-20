@@ -187,6 +187,7 @@ class AgentLoop:
             self.session_id,
             "assistant",
             content=response.get("content"),
+            reasoning_content=response.get("reasoning_content"),
             tool_calls=response.get("tool_calls"),
             finish_reason=response.get("finish_reason"),
         )

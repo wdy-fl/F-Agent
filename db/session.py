@@ -111,6 +111,7 @@ class SessionDB:
         session_id: str,
         role: str,
         content: str | None = None,
+        reasoning_content: str | None = None,
         tool_call_id: str | None = None,
         tool_calls: list[dict] | None = None,
         tool_name: str | None = None,
@@ -123,6 +124,7 @@ class SessionDB:
             session_id: 会话 ID
             role: 消息角色（system/user/assistant/tool）
             content: 消息文本内容
+            reasoning_content: 推理内容（DeepSeek thinking 模式）
             tool_call_id: 工具调用 ID（role=tool 时）
             tool_calls: 工具调用列表（assistant 消息）
             tool_name: 工具名称
@@ -135,9 +137,9 @@ class SessionDB:
         tool_calls_str = json.dumps(tool_calls, ensure_ascii=False) if tool_calls else None
         cur = self.conn.execute(
             """INSERT INTO messages
-               (session_id, role, content, tool_call_id, tool_calls, tool_name, token_count, finish_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (session_id, role, content, tool_call_id, tool_calls_str, tool_name, token_count, finish_reason),
+               (session_id, role, content, reasoning_content, tool_call_id, tool_calls, tool_name, token_count, finish_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (session_id, role, content, reasoning_content, tool_call_id, tool_calls_str, tool_name, token_count, finish_reason),
         )
         self.conn.commit()
         return cur.lastrowid or 0
@@ -187,6 +189,8 @@ class SessionDB:
             api_msg: dict[str, Any] = {"role": msg["role"]}
             if msg.get("content"):
                 api_msg["content"] = msg["content"]
+            if msg.get("reasoning_content"):
+                api_msg["reasoning_content"] = msg["reasoning_content"]
             if msg.get("tool_calls"):
                 api_msg["tool_calls"] = msg["tool_calls"]
             if msg.get("tool_call_id"):

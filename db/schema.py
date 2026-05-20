@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS messages (
     session_id TEXT NOT NULL REFERENCES sessions(id),
     role TEXT NOT NULL,
     content TEXT,
+    reasoning_content TEXT,
     tool_call_id TEXT,
     tool_calls TEXT,
     tool_name TEXT,
@@ -54,6 +55,12 @@ def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(CREATE_SESSIONS)
     conn.executescript(CREATE_MESSAGES)
     conn.executescript(CREATE_SCHEMA_VERSION)
+
+    # 兼容旧表：如果 messages 表缺少 reasoning_content 列则添加
+    cur = conn.execute("PRAGMA table_info(messages)")
+    columns = {row[1] for row in cur.fetchall()}
+    if "reasoning_content" not in columns:
+        conn.execute("ALTER TABLE messages ADD COLUMN reasoning_content TEXT")
 
     # 记录 schema 版本
     cur = conn.execute("SELECT version FROM schema_version")
