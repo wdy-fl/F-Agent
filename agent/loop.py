@@ -183,17 +183,12 @@ class AgentLoop:
         if not self.session_db or not self.session_id:
             return
 
-        kwargs: dict[str, Any] = {
-            "content": response.get("content"),
-            "tool_calls": response.get("tool_calls"),
-            "finish_reason": response.get("finish_reason"),
-        }
-        if response.get("reasoning_content"):
-            kwargs["reasoning_content"] = response["reasoning_content"]
         self.session_db.append_message(
             self.session_id,
             "assistant",
-            **kwargs,
+            content=response.get("content"),
+            tool_calls=response.get("tool_calls"),
+            finish_reason=response.get("finish_reason"),
         )
         self.session_db.update_session_stats(self.session_id, message_count=1)
 
