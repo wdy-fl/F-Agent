@@ -7,6 +7,8 @@ from typing import Any, Callable
 from agent.budget import IterationBudget
 from db.session import SessionDB
 from llm.client import LLMClient
+from memory.context_fence import inject_context
+from memory.manager import MemoryManager
 from tools.registry import registry
 
 logger = logging.getLogger(__name__)
@@ -20,11 +22,13 @@ class AgentLoop:
         llm: LLMClient,
         max_iterations: int = 50,
         session_db: SessionDB | None = None,
+        memory_manager: MemoryManager | None = None,
         output_callback: Callable[[str], None] | None = None,
     ):
         self.llm = llm
         self.max_iterations = max_iterations
         self.session_db = session_db
+        self.memory_manager = memory_manager
         self.output_callback = output_callback or self._default_output
         self.messages: list[dict[str, Any]] = []
         self.session_id: str | None = None
@@ -52,7 +56,7 @@ class AgentLoop:
         """运行一轮对话，返回最终回复文本
 
         Args:
-            user_message: 用户输入
+            user_message: 用户原始输入
             system_prompt: 系统提示词
 
         Returns:
@@ -61,12 +65,20 @@ class AgentLoop:
         # 初始化预算
         self.budget.reset()
 
+        # 预取记忆并注入到用户消息
+        llm_message = user_message
+        if self.memory_manager:
+            memory_context = self.memory_manager.prefetch(user_message)
+            if memory_context:
+                llm_message = inject_context(user_message, memory_context)
+
         self._ensure_conversation_started(system_prompt, user_message)
 
-        user_msg = {"role": "user", "content": user_message}
+        user_msg = {"role": "user", "content": llm_message}
         self.messages.append(user_msg)
 
         if self.session_db and self.session_id:
+            # DB 存储原始用户消息，不含记忆上下文，保证搜索干净
             self.session_db.append_message(self.session_id, "user", content=user_message)
             self.session_db.update_session_stats(self.session_id, message_count=1)
 
@@ -95,6 +107,7 @@ class AgentLoop:
             if not response.get("tool_calls"):
                 result = response.get("content", "")
                 self._persist_assistant_message(response)
+                self._sync_memory(user_message, result)
                 return result
 
             # 有工具调用 → 执行工具
@@ -119,7 +132,14 @@ class AgentLoop:
 
         # 预算耗尽
         logger.warning("Agent loop reached max iterations: %d", self.max_iterations)
-        return self._grace_call()
+        result = self._grace_call()
+        self._sync_memory(user_message, result)
+        return result
+
+    def _sync_memory(self, user_message: str, assistant_message: str) -> None:
+        """同步记忆（如果配置了记忆管理器）"""
+        if self.memory_manager and self.session_id:
+            self.memory_manager.sync(self.session_id, user_message, assistant_message)
 
     def _call_llm_stream(self, tools: list[dict] | None = None) -> dict[str, Any]:
         """流式调用 LLM，实时输出内容，返回完整响应"""

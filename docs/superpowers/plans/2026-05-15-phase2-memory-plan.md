@@ -109,6 +109,11 @@
 
 **测试:** 集成测试（mock LLM → 验证消息中包含 `<memory-context>` 标签）
 
+- [x] **Step 1:** 修改 `agent/loop.py`，AgentLoop 增加 memory_manager 参数，run() 注入记忆 + 结束 sync ✅ 2026-05-20
+- [x] **Step 2:** 修改 `agent/prompt.py`，增加 MEMORY_GUIDANCE ✅ 2026-05-20
+- [x] **Step 3:** 修改 `cli/interface.py`，创建 MemoryManager 并传入 AgentLoop ✅ 2026-05-20
+- [x] **Step 4:** 自测验证（59 tests all passed，无回归） ✅ 2026-05-20
+
 ---
 
 ### Task 5: 用户建模

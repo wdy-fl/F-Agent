@@ -33,20 +33,34 @@ TOOL_USE_GUIDANCE = """\
 - 有副作用的操作（写入文件、执行命令）会顺序执行
 """
 
+MEMORY_GUIDANCE = """\
+## 记忆系统
+你的用户消息可能包含 `<memory-context>` 标签，其中注入了：
+- 与当前话题相关的历史对话片段
+- 用户的偏好画像
+
+使用这些信息来个性化回复，但不要在回复中引用标签格式本身。
+"""
+
 
 def build_system_prompt(
     include_tools: bool = False,
+    include_memory_guidance: bool = True,
 ) -> str:
     """构建系统提示词
 
     Args:
         include_tools: 是否包含工具使用指引
+        include_memory_guidance: 是否包含记忆系统指引
     """
     parts = [AGENT_IDENTITY]
 
     if include_tools:
         tool_index = _build_tool_index()
         parts.append(TOOL_USE_GUIDANCE.format(tool_index=tool_index))
+
+    if include_memory_guidance:
+        parts.append(MEMORY_GUIDANCE)
 
     # 时间戳
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

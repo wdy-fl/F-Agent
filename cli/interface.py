@@ -14,6 +14,7 @@ from agent.prompt import build_system_prompt
 from config.settings import AppConfig, ensure_config_dir
 from db.session import SessionDB
 from llm.client import LLMClient
+from memory.manager import MemoryManager
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +32,19 @@ class CLIInterface:
         # 创建会话数据库
         self.session_db = SessionDB(config.db_path)
 
+        # 创建记忆管理器
+        self.memory_manager = MemoryManager(
+            self.session_db,
+            config.user_profile_path,
+            llm=self.llm,
+        )
+
         # 创建 Agent 循环
         self.agent = AgentLoop(
             self.llm,
             max_iterations=config.llm.max_iterations,
             session_db=self.session_db,
+            memory_manager=self.memory_manager,
             output_callback=self._on_stream_delta,
         )
 
