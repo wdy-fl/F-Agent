@@ -79,6 +79,10 @@
 
 **测试:** prefetch 流程测试（mock SessionDB.search_messages → 验证拼接格式）、画像读写测试
 
+- [x] **Step 1:** 创建 `memory/manager.py`，实现 MemoryManager（prefetch/sync/get_user_profile/update_user_profile） ✅ 2026-05-20
+- [x] **Step 2:** 编写测试（9 tests：prefetch 拼装/空搜索/无画像/空结果/画像读写/目录创建/sync 钩子） ✅ 2026-05-20
+- [x] **Step 3:** 自测验证（59 tests all passed） ✅ 2026-05-20
+
 ---
 
 ### Task 4: 记忆集成到主循环
