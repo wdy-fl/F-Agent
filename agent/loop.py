@@ -1,10 +1,12 @@
 """Agent 主循环：迭代 LLM 调用 + 工具执行 + 会话持久化"""
 
+import json
 import logging
 import uuid
 from typing import Any, Callable
 
 from agent.budget import IterationBudget
+from context.compressor import ContextCompressor
 from db.session import SessionDB
 from llm.client import LLMClient
 from memory.context_fence import inject_context
@@ -23,12 +25,14 @@ class AgentLoop:
         max_iterations: int = 50,
         session_db: SessionDB | None = None,
         memory_manager: MemoryManager | None = None,
+        compressor: ContextCompressor | None = None,
         output_callback: Callable[[str], None] | None = None,
     ):
         self.llm = llm
         self.max_iterations = max_iterations
         self.session_db = session_db
         self.memory_manager = memory_manager
+        self.compressor = compressor
         self.output_callback = output_callback or self._default_output
         self.messages: list[dict[str, Any]] = []
         self.session_id: str | None = None
@@ -130,6 +134,10 @@ class AgentLoop:
                     tool_call_count=len(response["tool_calls"]),
                 )
 
+            # 检查是否需要上下文压缩
+            if self.compressor:
+                self._check_compression()
+
         # 预算耗尽
         logger.warning("Agent loop reached max iterations: %d", self.max_iterations)
         result = self._grace_call()
@@ -140,6 +148,25 @@ class AgentLoop:
         """同步记忆（如果配置了记忆管理器）"""
         if self.memory_manager and self.session_id:
             self.memory_manager.sync(self.session_id, user_message, assistant_message)
+
+    def _estimate_total_tokens(self) -> int:
+        """估算当前消息列表的总 token 数"""
+        total = 0
+        for msg in self.messages:
+            try:
+                text = json.dumps(msg, ensure_ascii=False)
+            except (TypeError, ValueError):
+                text = str(msg)
+            total += max(1, int(len(text) / 2.5))
+        return total
+
+    def _check_compression(self) -> None:
+        """检查是否需要压缩，需要则执行"""
+        if not self.compressor:
+            return
+        estimated_tokens = self._estimate_total_tokens()
+        if self.compressor.should_compress(estimated_tokens):
+            self.messages = self.compressor.compress(self.messages, estimated_tokens)
 
     def _call_llm_stream(self, tools: list[dict] | None = None) -> dict[str, Any]:
         """流式调用 LLM，实时输出内容，返回完整响应"""

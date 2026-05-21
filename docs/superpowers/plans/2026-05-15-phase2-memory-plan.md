@@ -179,6 +179,13 @@
 
 **测试:** 压缩边界条件测试（阈值触发、反抖动、头尾保护、LLM 失败降级）
 
+- [x] **Step 1:** 创建 `context/compressor.py`，实现 ContextCompressor（阈值判断/头尾保护/LLM 摘要/反抖动/工具结果裁剪） ✅ 2026-05-20
+- [x] **Step 2:** 修改 `config/settings.py`，增加 CompressorConfig（threshold/min_saving/protected_head/protected_tail_tokens） ✅ 2026-05-20
+- [x] **Step 3:** 修改 `agent/loop.py`，集成 `_check_compression` 和 `_estimate_total_tokens` ✅ 2026-05-20
+- [x] **Step 4:** 修改 `cli/interface.py`，创建 ContextCompressor 并传入 AgentLoop ✅ 2026-05-20
+- [x] **Step 5:** 编写测试（10 tests：阈值触发/消息太少/LLM 摘要/失败降级/反抖动/工具裁剪/短结果不裁/token 估算/头保护） ✅ 2026-05-20
+- [x] **Step 6:** 自测验证（86 tests all passed） ✅ 2026-05-20
+
 ---
 
 ### 依赖关系

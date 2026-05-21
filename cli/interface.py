@@ -12,6 +12,7 @@ from rich.text import Text
 from agent.loop import AgentLoop
 from agent.prompt import build_system_prompt
 from config.settings import AppConfig, ensure_config_dir
+from context.compressor import ContextCompressor
 from db.session import SessionDB
 from llm.client import LLMClient
 from memory.manager import MemoryManager
@@ -53,12 +54,23 @@ class CLIInterface:
             profile_manager=self.profile_manager,
         )
 
+        # 创建上下文压缩器
+        self.compressor = ContextCompressor(
+            self.llm,
+            context_window=config.llm.context_window,
+            threshold=config.compressor.threshold,
+            min_saving=config.compressor.min_saving,
+            protected_head=config.compressor.protected_head,
+            protected_tail_tokens=config.compressor.protected_tail_tokens,
+        )
+
         # 创建 Agent 循环
         self.agent = AgentLoop(
             self.llm,
             max_iterations=config.llm.max_iterations,
             session_db=self.session_db,
             memory_manager=self.memory_manager,
+            compressor=self.compressor,
             output_callback=self._on_stream_delta,
         )
 

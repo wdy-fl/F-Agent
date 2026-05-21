@@ -39,11 +39,21 @@ class MemoryConfig:
 
 
 @dataclass
+class CompressorConfig:
+    """上下文压缩配置"""
+    threshold: float = 0.5
+    min_saving: float = 0.1
+    protected_head: int = 3
+    protected_tail_tokens: int = 20000
+
+
+@dataclass
 class AppConfig:
     """应用全局配置"""
     llm: LLMConfig = field(default_factory=LLMConfig)
     tools: ToolConfig = field(default_factory=ToolConfig)
     memory: MemoryConfig = field(default_factory=MemoryConfig)
+    compressor: CompressorConfig = field(default_factory=CompressorConfig)
     db_path: str = str(DEFAULT_DB_PATH)
     user_profile_path: str = str(DEFAULT_USER_PROFILE_PATH)
     skills_dir: str = str(DEFAULT_SKILLS_DIR)
@@ -108,11 +118,13 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
     llm_dict = config_dict.pop("llm", {})
     tools_dict = config_dict.pop("tools", {})
     memory_dict = config_dict.pop("memory", {})
+    compressor_dict = config_dict.pop("compressor", {})
 
     return AppConfig(
         llm=LLMConfig(**llm_dict),
         tools=ToolConfig(**tools_dict),
         memory=MemoryConfig(**memory_dict),
+        compressor=CompressorConfig(**compressor_dict),
         **config_dict,
     )
 
