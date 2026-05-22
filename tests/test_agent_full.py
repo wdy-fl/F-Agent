@@ -21,16 +21,14 @@ def test_budget_basic():
     assert not budget.consume()  # 已耗尽
 
 
-def test_budget_can_continue_with_grace():
-    """测试 grace call：预算耗尽后仍允许一次继续"""
+def test_budget_can_continue_only_checks_normal_iterations():
+    """测试预算耗尽后不再放行正常迭代。"""
     budget = IterationBudget(max_iterations=1)
 
-    budget.consume()  # 耗尽
-    assert budget.remaining == 0
-
-    # grace call
     assert budget.can_continue()
-    # 第二次不再允许
+    budget.consume()  # 耗尽
+
+    assert budget.remaining == 0
     assert not budget.can_continue()
 
 

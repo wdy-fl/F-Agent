@@ -161,6 +161,9 @@ class CLIInterface:
             self._print_banner()
         elif cmd == "/sessions":
             self._list_sessions()
+        elif cmd.startswith("/resume "):
+            session_id = command.strip().split(maxsplit=1)[1]
+            self._resume_session(session_id)
         elif cmd == "/stats":
             self._show_stats()
         else:
@@ -184,8 +187,21 @@ class CLIInterface:
         self.console.print("  /quit     - 退出程序")
         self.console.print("  /clear    - 清屏")
         self.console.print("  /sessions - 列出历史会话")
+        self.console.print("  /resume <id> - 恢复历史会话")
         self.console.print("  /stats    - 显示当前会话统计")
         self.console.print()
+
+    def _resume_session(self, session_id: str) -> None:
+        """恢复历史会话。"""
+        try:
+            restored_count = self.agent.restore_session(session_id, self.system_prompt)
+        except ValueError as e:
+            self.console.print(str(e), style="red")
+            return
+        self.console.print(
+            f"已恢复会话 {session_id}（{restored_count} 条历史消息）",
+            style="green",
+        )
 
     def _list_sessions(self) -> None:
         """列出历史会话"""
@@ -198,7 +214,7 @@ class CLIInterface:
         for s in sessions:
             title = s.get("title") or s["id"][:8]
             msg_count = s.get("message_count", 0)
-            self.console.print(f"  {title} ({msg_count} 条消息)")
+            self.console.print(f"  {s['id']}  {title} ({msg_count} 条消息)")
         self.console.print()
 
     def _show_stats(self) -> None:

@@ -56,7 +56,7 @@ F-Agent/
 │   ├── prompt.py              # 系统提示词构建：身份 + 技能 + 记忆 + 上下文文件
 │   └── budget.py              # 迭代预算控制 + 中断信号
 ├── tools/
-│   ├── registry.py            # 工具注册表：自注册 + 发现 + 调度
+│   ├── registry.py            # 工具注册表：自注册 + 发现 + 串行调度
 │   ├── terminal.py            # 终端执行
 │   ├── file_ops.py            # 文件读写
 │   ├── web_search.py          # Web 搜索
@@ -130,8 +130,8 @@ F-Agent/
 
 ### 3.3 工具执行策略
 
-- 默认并行执行（ThreadPoolExecutor），只读工具可并行
-- 有副作用的工具（文件写入、终端执行）顺序执行
+- 工具调用按 LLM 返回顺序串行执行，保证执行顺序与模型规划一致
+- `parallel_safe` 元数据暂时保留，但当前调度器不使用并行执行
 - 工具结果过大时自动截断（max_result_size 配置项）
 
 ### 3.4 预算控制
@@ -148,7 +148,7 @@ F-Agent/
 |------|---------|------|---------|
 | 会话记忆 | SQLite messages 表 | 所有对话消息 | 每轮对话自动存储 |
 | 会话搜索 | SQLite FTS5 索引 | 消息全文索引 | INSERT 触发器自动维护 |
-| 用户画像 | `~/.fagent/USER.md` | 偏好/习惯/项目上下文 | LLM 通过 memory 工具主动更新 |
+| 用户画像 | `workspace/USER.md` | 偏好/习惯/项目上下文 | LLM 通过 memory 工具主动更新 |
 
 ### 4.2 记忆流程
 
@@ -159,29 +159,30 @@ F-Agent/
   3. 包装在 <memory-context> 标签内注入用户消息
   4. LLM 看到的是：<memory-context>历史片段+画像</memory-context> + 实际用户输入
 
-对话结束后（sync）:
-  1. 存储 user_msg + assistant_msg 到 SQLite
-  2. FTS5 触发器自动索引
-  3. LLM 可通过 memory 工具写入/更新 USER.md
+对话过程中:
+  1. AgentLoop 将原始 user_msg、assistant_msg 和 tool 结果写入 SQLite
+  2. FTS5 触发器自动维护全文索引
+  3. MemoryManager.sync 作为记忆系统扩展钩子，不承担 SQLite 写入职责
+  4. LLM 可通过 memory 工具写入/更新 USER.md
 ```
 
 ### 4.3 用户画像更新机制
 
-- LLM 通过 memory 工具调用 update_profile action
-- 工具内部读取当前 USER.md + 新观察 → 调用 LLM 生成合并后的画像 → 写回
+- `memory.update_profile`：常规画像更新路径，读取当前 USER.md 和新观察，通过 LLM 合并后写回
+- `memory.save`：低级直接保存路径，直接写入/覆盖 USER.md 内容，仅在需要明确覆盖时使用
 - 不在每轮都触发，只在 LLM 主动调用时更新
 - 画像长度上限控制（超出时 LLM 压缩旧条目）
 
 ### 4.4 上下文围栏
 
-`<memory-context>` 标签将召回的记忆与用户实际输入区分开，防止 LLM 将历史片段误认为当前输入。围栏在流式输出中也能正确剥离（处理标签跨 chunk 的情况）。
+`<memory-context>` 标签将召回的记忆与用户实际输入区分开，防止 LLM 将历史片段误认为当前输入。当前实现支持完整消息级别的注入和剥离，围栏内容不会写入 SQLite 中的原始用户消息。
 
 ## 5. 技能系统
 
 ### 5.1 技能结构
 
 ```
-~/.fagent/skills/
+workspace/skills/
   <category>/
     <skill-name>/
       SKILL.md          # 必需：YAML frontmatter + Markdown 指令
@@ -237,7 +238,7 @@ usage_count: 0
 
 ### 5.5 技能注入方式
 
-- 会话启动时扫描 `~/.fagent/skills/`，构建技能索引
+- 会话启动时扫描 `workspace/skills/`，构建技能索引
 - 技能描述（name + description）注入系统提示词的技能索引区
 - 匹配到的技能全文指令注入系统提示词
 
@@ -272,14 +273,13 @@ usage_count: 0
 
 摘要使用固定结构，保证跨压缩轮次的信息连贯性：
 
-- Active Task — 当前正在执行的任务
-- Goal — 任务目标
-- Completed Actions — 已完成的操作
-- In Progress — 正在进行的工作
-- Key Decisions — 做出的关键决策
-- Pending Questions — 待解决的问题
-- Relevant Files — 涉及的文件
-- Remaining Work — 剩余工作
+- 当前任务
+- 已完成
+- 进行中
+- 关键决策
+- 待解决问题
+- 相关文件
+- 剩余工作
 
 ## 7. 工具系统
 
@@ -317,20 +317,17 @@ registry.register(
 ```
 LLM 返回 tool_calls
   ↓
-loop.py 遍历 tool_calls
-  ↓ 并行安全判断
-安全 → ThreadPoolExecutor 并行执行
-不安全 → 顺序执行
+loop.py 按原始顺序遍历 tool_calls
   ↓
 registry.dispatch(name, args) → handler → result
   ↓
-结果追加到消息列表
+结果按调用顺序追加到消息列表
 ```
 
 ### 7.4 MVP 工具集
 
-| 工具 | 用途 | 并行安全 |
-|------|------|---------|
+| 工具 | 用途 | parallel_safe 元数据 |
+|------|------|--------------------|
 | terminal | 终端命令执行 | 否 |
 | read_file | 读文件 | 是 |
 | write_file | 写文件 | 否 |
@@ -398,7 +395,7 @@ END;
 ### 8.2 文件存储
 
 ```
-~/.fagent/
+workspace/
 ├── config.yaml           # 配置文件
 ├── state.db              # SQLite 数据库
 ├── USER.md               # 用户画像
@@ -444,7 +441,7 @@ END;
 - `tools/terminal.py`：终端执行
 - `tools/file_ops.py`：文件读写 + 列目录
 - `tools/web_search.py`：Web 搜索 + 网页抓取
-- **测试**：工具调度冒烟测试（并发安全判断 + 结果截断）
+- **测试**：工具调度冒烟测试（串行顺序 + 结果截断）
 
 #### Step 3 — 会话持久化（最小版）
 
