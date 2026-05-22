@@ -10,6 +10,7 @@ workspace/
 .idea/
 .vscode/
 .claude/
+.worktrees/
 *.swp
 *.swo
 .DS_Store
