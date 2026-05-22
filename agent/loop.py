@@ -269,8 +269,7 @@ class AgentLoop:
             )
             self.session_db.update_session_stats(self.session_id, message_count=1)
 
-        tools = registry.get_definitions()
-        response = self._call_llm_stream(tools=tools if tools else None)
+        response = self._call_llm_stream(tools=None)
 
         if self.session_db and self.session_id:
             usage = response.get("usage")
