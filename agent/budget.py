@@ -6,7 +6,7 @@ import threading
 class IterationBudget:
     """线程安全的迭代预算控制器
 
-    跟踪剩余可用迭代次数，支持中断信号和 grace call。
+    跟踪剩余可用迭代次数，支持中断信号。
     """
 
     def __init__(self, max_iterations: int = 50):
@@ -14,7 +14,6 @@ class IterationBudget:
         self._remaining = max_iterations
         self._interrupted = False
         self._lock = threading.Lock()
-        self._grace_call_used = False
 
     @property
     def remaining(self) -> int:
@@ -40,20 +39,9 @@ class IterationBudget:
             return False
 
     def can_continue(self) -> bool:
-        """检查是否可以继续迭代
-
-        包括 grace call 的可能性
-        """
+        """检查是否可以继续正常迭代"""
         with self._lock:
-            if self._interrupted:
-                return False
-            if self._remaining > 0:
-                return True
-            # 预算耗尽，允许一次 grace call
-            if not self._grace_call_used:
-                self._grace_call_used = True
-                return True
-            return False
+            return not self._interrupted and self._remaining > 0
 
     def interrupt(self) -> None:
         """发送中断信号"""
@@ -64,4 +52,3 @@ class IterationBudget:
         with self._lock:
             self._remaining = self.max_iterations
             self._interrupted = False
-            self._grace_call_used = False

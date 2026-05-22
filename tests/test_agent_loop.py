@@ -68,6 +68,39 @@ def test_agent_loop_tool_calls_execute():
     assert any(msg.get("role") == "tool" for msg in agent.messages)
 
 
+def test_agent_loop_budget_exhaustion_uses_single_grace_call():
+    """预算耗尽后只进行一次 grace call，不额外放行正常调用。"""
+    config = LLMConfig(api_key="sk-test")
+    llm = LLMClient(config)
+    agent = AgentLoop(llm, max_iterations=1, output_callback=lambda t: None)
+
+    tool_events = _make_stream_events(
+        content="",
+        tool_calls=[{
+            "id": "call_1",
+            "type": "function",
+            "function": {"name": "terminal", "arguments": '{"command": "echo hello"}'},
+        }],
+        finish_reason="tool_calls",
+    )
+    grace_events = _make_stream_events("预算已耗尽，这是最终总结。")
+
+    import importlib
+    import tools.terminal
+    importlib.reload(tools.terminal)
+
+    with patch.object(llm, "chat_stream", side_effect=[iter(tool_events), iter(grace_events)]) as chat_stream:
+        result = agent.run("运行命令", build_system_prompt(include_tools=True))
+
+    assert result == "预算已耗尽，这是最终总结。"
+    assert chat_stream.call_count == 2
+    assert agent.budget.remaining == 0
+    assert any(
+        msg.get("role") == "user" and msg.get("content") == "请总结当前进展并给出最终回复。"
+        for msg in agent.messages
+    )
+
+
 def test_agent_loop_preserves_reasoning_content():
     """测试 reasoning_content 在 assistant 消息中被保留"""
     config = LLMConfig(api_key="sk-test")
