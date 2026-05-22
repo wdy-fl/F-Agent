@@ -1,9 +1,8 @@
-"""工具注册表：自注册 + 发现 + 调度"""
+"""工具注册表：自注册、发现和串行调度"""
 
 import json
 import logging
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
@@ -28,7 +27,7 @@ class ToolEntry:
 
 
 class ToolRegistry:
-    """线程安全的工具注册表，支持注册、调度和并行执行"""
+    """线程安全的工具注册表，支持注册和串行调度"""
 
     def __init__(self):
         self._tools: dict[str, ToolEntry] = {}
@@ -110,11 +109,10 @@ class ToolRegistry:
         self,
         tool_calls: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
-        """并行调度多个工具调用
+        """按原始顺序串行调度多个工具调用
 
-        将 tool_calls 分为并行安全组和不安全组：
-        - 并行安全组用 ThreadPoolExecutor 并行执行
-        - 不安全组顺序执行
+        保留历史方法名以兼容现有调用方，但不再并行执行，
+        也不根据 parallel_safe 元数据重排工具调用顺序。
 
         Args:
             tool_calls: OpenAI 格式的 tool_calls 列表
@@ -122,58 +120,22 @@ class ToolRegistry:
         Returns:
             工具结果消息列表（role=tool 格式）
         """
-        safe_calls = []
-        unsafe_calls = []
+        tool_results = []
 
-        with self._lock:
-            for tc in tool_calls:
-                func = tc["function"]
-                name = func["name"]
-                entry = self._tools.get(name)
-                if entry and entry.parallel_safe:
-                    safe_calls.append(tc)
-                else:
-                    unsafe_calls.append(tc)
-
-        results: dict[str, str] = {}
-
-        # 并行执行安全的工具
-        if safe_calls:
-            with ThreadPoolExecutor(max_workers=4) as executor:
-                futures = {}
-                for tc in safe_calls:
-                    func = tc["function"]
-                    call_id = tc["id"]
-                    try:
-                        args = json.loads(func["arguments"]) if isinstance(func["arguments"], str) else func["arguments"]
-                    except json.JSONDecodeError:
-                        results[call_id] = json.dumps({"error": "Invalid JSON arguments"})
-                        continue
-                    futures[executor.submit(self.dispatch, func["name"], args)] = call_id
-
-                for future in as_completed(futures):
-                    call_id = futures[future]
-                    results[call_id] = future.result()
-
-        # 顺序执行不安全的工具
-        for tc in unsafe_calls:
+        for tc in tool_calls:
             func = tc["function"]
             call_id = tc["id"]
             try:
                 args = json.loads(func["arguments"]) if isinstance(func["arguments"], str) else func["arguments"]
             except json.JSONDecodeError:
-                results[call_id] = json.dumps({"error": "Invalid JSON arguments"})
-                continue
-            results[call_id] = self.dispatch(func["name"], args)
+                content = json.dumps({"error": "Invalid JSON arguments"})
+            else:
+                content = self.dispatch(func["name"], args)
 
-        # 按 tool_calls 原始顺序组装结果
-        tool_results = []
-        for tc in tool_calls:
-            call_id = tc["id"]
             tool_results.append({
                 "role": "tool",
                 "tool_call_id": call_id,
-                "content": results.get(call_id, json.dumps({"error": "No result"})),
+                "content": content,
             })
 
         return tool_results
