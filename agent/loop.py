@@ -144,6 +144,21 @@ class AgentLoop:
         self._sync_memory(user_message, result)
         return result
 
+    def restore_session(self, session_id: str, system_prompt: str) -> int:
+        """恢复历史会话到当前 AgentLoop。"""
+        if not self.session_db:
+            raise ValueError("Session DB not configured")
+
+        session = self.session_db.get_session(session_id)
+        if not session:
+            raise ValueError(f"Session not found: {session_id}")
+
+        restored = self.session_db.get_messages_as_conversation(session_id)
+        self.session_id = session_id
+        self.messages = [{"role": "system", "content": system_prompt}]
+        self.messages.extend(restored)
+        return len(restored)
+
     def _sync_memory(self, user_message: str, assistant_message: str) -> None:
         """同步记忆（如果配置了记忆管理器）"""
         if self.memory_manager and self.session_id:

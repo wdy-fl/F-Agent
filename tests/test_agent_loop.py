@@ -119,6 +119,84 @@ def test_agent_loop_preserves_reasoning_content():
     assert assistant_msgs[0].get("reasoning_content") == "I should greet the user"
 
 
+def test_agent_loop_restore_session_loads_persisted_messages(tmp_path):
+    """恢复历史会话后，AgentLoop 使用持久化消息继续对话。"""
+    from db.session import SessionDB
+
+    db = SessionDB(tmp_path / "test.db")
+    db.create_session("sess-restore", "deepseek-v4-pro", "old system")
+    db.append_message("sess-restore", "user", content="之前的问题")
+    db.append_message("sess-restore", "assistant", content="之前的回答")
+
+    config = LLMConfig(api_key="sk-test")
+    llm = LLMClient(config)
+    agent = AgentLoop(llm, session_db=db, output_callback=lambda t: None)
+
+    restored_count = agent.restore_session("sess-restore", "new system")
+
+    assert restored_count == 2
+    assert agent.session_id == "sess-restore"
+    assert agent.messages[0] == {"role": "system", "content": "new system"}
+    assert agent.messages[1] == {"role": "user", "content": "之前的问题"}
+    assert agent.messages[2] == {"role": "assistant", "content": "之前的回答"}
+    db.close()
+
+
+def test_agent_loop_restore_session_rejects_missing_session(tmp_path):
+    """恢复不存在的会话时抛出清晰错误。"""
+    from db.session import SessionDB
+    import pytest
+
+    db = SessionDB(tmp_path / "test.db")
+    config = LLMConfig(api_key="sk-test")
+    llm = LLMClient(config)
+    agent = AgentLoop(llm, session_db=db, output_callback=lambda t: None)
+
+    with pytest.raises(ValueError, match="Session not found"):
+        agent.restore_session("missing", "system")
+    db.close()
+
+
+def test_agent_loop_restore_session_requires_session_db():
+    """未配置 SessionDB 时不能恢复会话。"""
+    import pytest
+
+    config = LLMConfig(api_key="sk-test")
+    llm = LLMClient(config)
+    agent = AgentLoop(llm, output_callback=lambda t: None)
+
+    with pytest.raises(ValueError, match="Session DB not configured"):
+        agent.restore_session("sess", "system")
+
+
+def test_agent_loop_restore_session_continues_same_session(tmp_path):
+    """恢复后继续对话时复用原 session 写入新消息。"""
+    from db.session import SessionDB
+
+    db = SessionDB(tmp_path / "test.db")
+    db.create_session("sess-continue", "deepseek-v4-pro", "old system")
+    db.append_message("sess-continue", "user", content="之前的问题")
+    db.append_message("sess-continue", "assistant", content="之前的回答")
+
+    config = LLMConfig(api_key="sk-test")
+    llm = LLMClient(config)
+    agent = AgentLoop(llm, session_db=db, output_callback=lambda t: None)
+    agent.restore_session("sess-continue", "new system")
+
+    stream_events = _make_stream_events("继续后的回答")
+    with patch.object(llm, "chat_stream", return_value=iter(stream_events)):
+        result = agent.run("继续提问", "new system")
+
+    assert result == "继续后的回答"
+    assert agent.session_id == "sess-continue"
+    assert len(db.list_sessions()) == 1
+    conversation = db.get_messages_as_conversation("sess-continue")
+    assert [msg["role"] for msg in conversation] == ["user", "assistant", "user", "assistant"]
+    assert conversation[-2]["content"] == "继续提问"
+    assert conversation[-1]["content"] == "继续后的回答"
+    db.close()
+
+
 def test_build_system_prompt():
     """测试系统提示词构建"""
     prompt = build_system_prompt()
