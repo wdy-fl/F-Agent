@@ -30,7 +30,7 @@ def test_agent_loop_basic():
 
     stream_events = _make_stream_events("你好！我是阿福。")
     with patch.object(llm, "chat_stream", return_value=iter(stream_events)):
-        result = agent.run("你好", build_system_prompt())
+        result = agent.run("你好")
 
     assert result == "你好！我是阿福。"
     assert len(agent.messages) == 3  # system + user + assistant
@@ -61,7 +61,7 @@ def test_agent_loop_tool_calls_execute():
     final_events = _make_stream_events("命令执行成功，输出 hello")
 
     with patch.object(llm, "chat_stream", side_effect=[iter(tool_events), iter(final_events)]):
-        result = agent.run("运行命令", build_system_prompt(include_tools=True))
+        result = agent.run("运行命令")
 
     assert result == "命令执行成功，输出 hello"
     # 消息列表应包含工具结果
@@ -90,7 +90,7 @@ def test_agent_loop_budget_exhaustion_uses_single_grace_call():
     importlib.reload(tools.terminal)
 
     with patch.object(llm, "chat_stream", side_effect=[iter(tool_events), iter(grace_events)]) as chat_stream:
-        result = agent.run("运行命令", build_system_prompt(include_tools=True))
+        result = agent.run("运行命令")
 
     assert result == "预算已耗尽，这是最终总结。"
     assert chat_stream.call_count == 2
@@ -123,7 +123,7 @@ def test_agent_loop_grace_call_does_not_expose_tools():
     importlib.reload(tools.terminal)
 
     with patch.object(llm, "chat_stream", side_effect=[iter(tool_events), iter(grace_events)]) as chat_stream:
-        agent.run("运行命令", build_system_prompt(include_tools=True))
+        agent.run("运行命令")
 
     assert chat_stream.call_args_list[0].kwargs["tools"]
     assert chat_stream.call_args_list[1].kwargs["tools"] is None
@@ -140,7 +140,7 @@ def test_agent_loop_preserves_reasoning_content():
     events[-1]["reasoning_content"] = "I should greet the user"
 
     with patch.object(llm, "chat_stream", return_value=iter(events)):
-        agent.run("Hi", build_system_prompt())
+        agent.run("Hi")
 
     assistant_msgs = [m for m in agent.messages if m["role"] == "assistant"]
     assert len(assistant_msgs) == 1
@@ -160,11 +160,12 @@ def test_agent_loop_restore_session_loads_persisted_messages(tmp_path):
     llm = LLMClient(config)
     agent = AgentLoop(llm, session_db=db, output_callback=lambda t: None)
 
-    restored_count = agent.restore_session("sess-restore", "new system")
+    restored_count = agent.restore_session("sess-restore")
 
     assert restored_count == 2
     assert agent.session_id == "sess-restore"
-    assert agent.messages[0] == {"role": "system", "content": "new system"}
+    assert agent.messages[0]["role"] == "system"
+    assert len(agent.messages[0]["content"]) > 0
     assert agent.messages[1] == {"role": "user", "content": "之前的问题"}
     assert agent.messages[2] == {"role": "assistant", "content": "之前的回答"}
     db.close()
@@ -181,7 +182,7 @@ def test_agent_loop_restore_session_rejects_missing_session(tmp_path):
     agent = AgentLoop(llm, session_db=db, output_callback=lambda t: None)
 
     with pytest.raises(ValueError, match="Session not found"):
-        agent.restore_session("missing", "system")
+        agent.restore_session("missing")
     db.close()
 
 
@@ -194,7 +195,7 @@ def test_agent_loop_restore_session_requires_session_db():
     agent = AgentLoop(llm, output_callback=lambda t: None)
 
     with pytest.raises(ValueError, match="Session DB not configured"):
-        agent.restore_session("sess", "system")
+        agent.restore_session("sess")
 
 
 def test_agent_loop_restore_session_continues_same_session(tmp_path):
@@ -209,11 +210,11 @@ def test_agent_loop_restore_session_continues_same_session(tmp_path):
     config = LLMConfig(api_key="sk-test")
     llm = LLMClient(config)
     agent = AgentLoop(llm, session_db=db, output_callback=lambda t: None)
-    agent.restore_session("sess-continue", "new system")
+    agent.restore_session("sess-continue")
 
     stream_events = _make_stream_events("继续后的回答")
     with patch.object(llm, "chat_stream", return_value=iter(stream_events)):
-        result = agent.run("继续提问", "new system")
+        result = agent.run("继续提问")
 
     assert result == "继续后的回答"
     assert agent.session_id == "sess-continue"

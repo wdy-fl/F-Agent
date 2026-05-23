@@ -10,7 +10,6 @@ from rich.markdown import Markdown
 from rich.text import Text
 
 from agent.loop import AgentLoop
-from agent.prompt import build_system_prompt
 from config.settings import AppConfig, ensure_config_dir
 from context.compressor import ContextCompressor
 from db.session import SessionDB
@@ -74,9 +73,6 @@ class CLIInterface:
             output_callback=self._on_stream_delta,
         )
 
-        # 构建系统提示词
-        self.system_prompt = build_system_prompt(include_tools=True)
-
         # prompt_toolkit 会话
         history_path = ensure_config_dir() / "history"
         self.prompt_session = PromptSession(history=FileHistory(str(history_path)))
@@ -117,7 +113,7 @@ class CLIInterface:
                 with Live(Text(""), console=self.console, transient=False, refresh_per_second=15) as live:
                     self._live = live
                     try:
-                        result = self.agent.run(user_input, self.system_prompt)
+                        result = self.agent.run(user_input)
                     except KeyboardInterrupt:
                         self.agent.budget.interrupt()
                         live.stop()
@@ -194,7 +190,7 @@ class CLIInterface:
     def _resume_session(self, session_id: str) -> None:
         """恢复历史会话。"""
         try:
-            restored_count = self.agent.restore_session(session_id, self.system_prompt)
+            restored_count = self.agent.restore_session(session_id)
         except ValueError as e:
             self.console.print(str(e), style="red")
             return

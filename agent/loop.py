@@ -6,6 +6,7 @@ import uuid
 from typing import Any, Callable
 
 from agent.budget import IterationBudget
+from agent.prompt import build_system_prompt
 from context.compressor import ContextCompressor
 from db.session import SessionDB
 from llm.client import LLMClient
@@ -34,6 +35,7 @@ class AgentLoop:
         self.memory_manager = memory_manager
         self.compressor = compressor
         self.output_callback = output_callback or self._default_output
+        self.system_prompt = build_system_prompt(include_tools=True)
         self.messages: list[dict[str, Any]] = []
         self.session_id: str | None = None
         self.budget = IterationBudget(max_iterations)
@@ -42,26 +44,25 @@ class AgentLoop:
         """默认输出方法（简单 print）"""
         print(text, end="", flush=True)
 
-    def _ensure_conversation_started(self, system_prompt: str, first_user_message: str) -> None:
+    def _ensure_conversation_started(self, first_user_message: str) -> None:
         """初始化当前 AgentLoop 生命周期内的连续对话"""
         if not self.messages:
-            self.messages.append({"role": "system", "content": system_prompt})
+            self.messages.append({"role": "system", "content": self.system_prompt})
 
         if self.session_db and not self.session_id:
             self.session_id = str(uuid.uuid4())
             self.session_db.create_session(
                 self.session_id,
                 self.llm.model,
-                system_prompt,
+                self.system_prompt,
                 title=first_user_message[:50],
             )
 
-    def run(self, user_message: str, system_prompt: str) -> str:
+    def run(self, user_message: str) -> str:
         """运行一轮对话，返回最终回复文本
 
         Args:
             user_message: 用户原始输入
-            system_prompt: 系统提示词
 
         Returns:
             Agent 的最终文本回复
@@ -76,7 +77,7 @@ class AgentLoop:
             if memory_context:
                 llm_message = inject_context(user_message, memory_context)
 
-        self._ensure_conversation_started(system_prompt, user_message)
+        self._ensure_conversation_started(user_message)
 
         user_msg = {"role": "user", "content": llm_message}
         self.messages.append(user_msg)
@@ -144,7 +145,7 @@ class AgentLoop:
         self._sync_memory(user_message, result)
         return result
 
-    def restore_session(self, session_id: str, system_prompt: str) -> int:
+    def restore_session(self, session_id: str) -> int:
         """恢复历史会话到当前 AgentLoop。"""
         if not self.session_db:
             raise ValueError("Session DB not configured")
@@ -155,7 +156,7 @@ class AgentLoop:
 
         restored = self.session_db.get_messages_as_conversation(session_id)
         self.session_id = session_id
-        self.messages = [{"role": "system", "content": system_prompt}]
+        self.messages = [{"role": "system", "content": self.system_prompt}]
         self.messages.extend(restored)
         return len(restored)
 

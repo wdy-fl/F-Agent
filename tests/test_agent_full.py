@@ -82,7 +82,7 @@ def test_agent_loop_with_tool_execution():
     importlib.reload(tools.terminal)
 
     with patch.object(llm, "chat_stream", side_effect=[iter(tool_call_events), iter(final_events)]):
-        result = agent.run("运行命令", "You are a helper")
+        result = agent.run("运行命令")
 
     assert result == "命令执行成功"
     # 验证消息列表包含工具结果
@@ -103,7 +103,7 @@ def test_agent_loop_with_session_persistence(tmp_path):
     agent = AgentLoop(llm, max_iterations=10, session_db=session_db, output_callback=lambda t: None)
 
     with patch.object(llm, "chat_stream", return_value=iter(events)):
-        result = agent.run("你好", "You are a helper")
+        result = agent.run("你好")
 
     assert result == "你好！"
     assert agent.session_id is not None
@@ -138,14 +138,14 @@ def test_agent_loop_preserves_context_between_runs():
         ])
 
     with patch.object(llm, "chat_stream", side_effect=fake_chat_stream):
-        agent.run("我的名字是王当当，你可以叫我当当大人", "You are a helper")
-        result = agent.run("现在你知道我是谁了吗？", "You are a helper")
+        agent.run("我的名字是王当当，你可以叫我当当大人")
+        result = agent.run("现在你知道我是谁了吗？")
 
     assert result == "知道，您是王当当"
     assert len(captured_messages) == 2
     second_call_messages = captured_messages[1]
     assert second_call_messages == [
-        {"role": "system", "content": "You are a helper"},
+        {"role": "system", "content": agent.system_prompt},
         {"role": "user", "content": "我的名字是王当当，你可以叫我当当大人"},
         {"role": "assistant", "content": "好的，当当大人"},
         {"role": "user", "content": "现在你知道我是谁了吗？"},
@@ -171,9 +171,9 @@ def test_agent_loop_reuses_session_across_runs(tmp_path):
         ])
 
     with patch.object(llm, "chat_stream", side_effect=fake_chat_stream):
-        agent.run("第一轮", "You are a helper")
+        agent.run("第一轮")
         first_session_id = agent.session_id
-        agent.run("第二轮", "You are a helper")
+        agent.run("第二轮")
 
     assert first_session_id is not None
     assert agent.session_id == first_session_id
@@ -204,8 +204,8 @@ def test_agent_loop_keeps_single_system_prompt_across_runs():
         ])
 
     with patch.object(llm, "chat_stream", side_effect=fake_chat_stream):
-        agent.run("第一轮", "You are a helper")
-        agent.run("第二轮", "You are a helper")
+        agent.run("第一轮")
+        agent.run("第二轮")
 
     system_messages = [m for m in agent.messages if m["role"] == "system"]
-    assert system_messages == [{"role": "system", "content": "You are a helper"}]
+    assert system_messages == [{"role": "system", "content": agent.system_prompt}]
