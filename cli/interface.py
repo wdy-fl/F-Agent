@@ -129,6 +129,10 @@ class CLIInterface:
             finally:
                 self._live = None
 
+        self.close()
+
+    def close(self) -> None:
+        """清理各组件资源"""
         self.session_db.close()
 
     def _on_stream_delta(self, text: str) -> None:
