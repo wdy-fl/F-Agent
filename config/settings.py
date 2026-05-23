@@ -1,6 +1,5 @@
-"""配置管理模块：YAML 配置加载 + 环境变量覆盖"""
+"""配置管理模块：YAML 配置加载"""
 
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -71,37 +70,8 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
-def _apply_env_overrides(config_dict: dict) -> dict:
-    """用环境变量覆盖配置项"""
-    env_mapping = {
-        "FAGENT_MODEL": ("llm", "model"),
-        "FAGENT_BASE_URL": ("llm", "base_url"),
-        "FAGENT_CONTEXT_WINDOW": ("llm", "context_window"),
-        "FAGENT_MAX_ITERATIONS": ("llm", "max_iterations"),
-        "FAGENT_DB_PATH": ("db_path",),
-        "FAGENT_TEMPERATURE": ("llm", "temperature"),
-    }
-
-    for env_key, path in env_mapping.items():
-        value = os.environ.get(env_key)
-        if value is not None:
-            current = config_dict
-            for key in path[:-1]:
-                current = current.setdefault(key, {})
-            # 数值类型转换
-            leaf_key = path[-1]
-            if leaf_key in ("context_window", "max_iterations"):
-                current[leaf_key] = int(value)
-            elif leaf_key == "temperature":
-                current[leaf_key] = float(value)
-            else:
-                current[leaf_key] = value
-
-    return config_dict
-
-
 def load_config(config_path: str | Path | None = None) -> AppConfig:
-    """加载配置：默认值 → YAML 文件 → 环境变量覆盖"""
+    """加载配置：默认值 → YAML 文件"""
     config_dict = {}
 
     # 从 YAML 文件加载
@@ -110,9 +80,6 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
         with open(path, "r", encoding="utf-8") as f:
             yaml_config = yaml.safe_load(f) or {}
         config_dict = _deep_merge(config_dict, yaml_config)
-
-    # 环境变量覆盖
-    config_dict = _apply_env_overrides(config_dict)
 
     # 构造 AppConfig
     llm_dict = config_dict.pop("llm", {})
