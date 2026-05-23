@@ -32,7 +32,7 @@ def configure_logging(log_dir):
     logging.basicConfig(
         filename=str(log_path),
         level=logging.WARNING,
-        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
         force=True,
     )
 
