@@ -4,3 +4,4 @@ import tools.terminal
 import tools.file_ops
 import tools.web_search
 import tools.memory
+import tools.think
