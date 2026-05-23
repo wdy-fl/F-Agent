@@ -104,8 +104,8 @@ class AgentLoop:
         # 主循环
         while self.budget.can_continue():
             self.budget.consume()
-            logger.info("循环迭代 %d/%d, messages count=%d",
-                        self.budget.used, self.max_iterations, len(self.messages))
+            logger.info("循环迭代 剩余%d/%d, messages count=%d",
+                        self.budget.remaining, self.max_iterations, len(self.messages))
 
             # 调用 LLM（流式）
             logger.debug("正在调用 LLM 流式接口")
