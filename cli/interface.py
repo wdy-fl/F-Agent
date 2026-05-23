@@ -11,12 +11,7 @@ from rich.text import Text
 
 from agent.loop import AgentLoop
 from config.settings import AppConfig, ensure_config_dir
-from context.compressor import ContextCompressor
 from db.session import SessionDB
-from llm.client import LLMClient
-from memory.manager import MemoryManager
-from memory.user_profile import UserProfileManager
-from tools.memory import set_managers
 
 logger = logging.getLogger(__name__)
 
@@ -28,48 +23,13 @@ class CLIInterface:
         self.config = config
         self.console = Console()
 
-        # 创建 LLM 客户端
-        self.llm = LLMClient(config.llm)
-
-        # 创建会话数据库
+        # 创建会话数据库（CLIInterface 和 AgentLoop 共享）
         self.session_db = SessionDB(config.db_path)
 
-        # 创建记忆管理器
-        self.memory_manager = MemoryManager(
-            self.session_db,
-            config.user_profile_path,
-            llm=self.llm,
-        )
-
-        # 创建用户画像管理器
-        self.profile_manager = UserProfileManager(
-            config.user_profile_path,
-            llm=self.llm,
-        )
-
-        # 注入到 memory 工具
-        set_managers(
-            memory_manager=self.memory_manager,
-            profile_manager=self.profile_manager,
-        )
-
-        # 创建上下文压缩器
-        self.compressor = ContextCompressor(
-            self.llm,
-            context_window=config.llm.context_window,
-            threshold=config.compressor.threshold,
-            min_saving=config.compressor.min_saving,
-            protected_head=config.compressor.protected_head,
-            protected_tail_tokens=config.compressor.protected_tail_tokens,
-        )
-
-        # 创建 Agent 循环
+        # 创建 Agent 循环（AgentLoop 内部自行创建 llm/memory/compressor 等依赖）
         self.agent = AgentLoop(
-            self.llm,
-            max_iterations=config.llm.max_iterations,
+            config,
             session_db=self.session_db,
-            memory_manager=self.memory_manager,
-            compressor=self.compressor,
             output_callback=self._on_stream_delta,
         )
 

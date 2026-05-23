@@ -7,11 +7,14 @@ from typing import Any, Callable
 
 from agent.budget import IterationBudget
 from agent.prompt import build_system_prompt
+from config.settings import AppConfig
 from context.compressor import ContextCompressor
 from db.session import SessionDB
 from llm.client import LLMClient
 from memory.context_fence import inject_context
 from memory.manager import MemoryManager
+from memory.user_profile import UserProfileManager
+from tools.memory import set_managers
 from tools.registry import registry
 
 logger = logging.getLogger(__name__)
@@ -22,23 +25,40 @@ class AgentLoop:
 
     def __init__(
         self,
-        llm: LLMClient,
-        max_iterations: int = 50,
+        config: AppConfig,
         session_db: SessionDB | None = None,
-        memory_manager: MemoryManager | None = None,
-        compressor: ContextCompressor | None = None,
         output_callback: Callable[[str], None] | None = None,
     ):
-        self.llm = llm
-        self.max_iterations = max_iterations
+        self.llm = LLMClient(config.llm)
+        self.max_iterations = config.llm.max_iterations
         self.session_db = session_db
-        self.memory_manager = memory_manager
-        self.compressor = compressor
+        self.memory_manager = (
+            MemoryManager(session_db, config.user_profile_path, llm=self.llm)
+            if session_db
+            else None
+        )
+        self.profile_manager = UserProfileManager(
+            config.user_profile_path, llm=self.llm
+        )
+        self.compressor = ContextCompressor(
+            self.llm,
+            context_window=config.llm.context_window,
+            threshold=config.compressor.threshold,
+            min_saving=config.compressor.min_saving,
+            protected_head=config.compressor.protected_head,
+            protected_tail_tokens=config.compressor.protected_tail_tokens,
+        )
+
+        set_managers(
+            memory_manager=self.memory_manager,
+            profile_manager=self.profile_manager,
+        )
+
         self.output_callback = output_callback or self._default_output
         self.system_prompt = build_system_prompt(include_tools=True)
         self.messages: list[dict[str, Any]] = []
         self.session_id: str | None = None
-        self.budget = IterationBudget(max_iterations)
+        self.budget = IterationBudget(self.max_iterations)
 
     def _default_output(self, text: str) -> None:
         """默认输出方法（简单 print）"""

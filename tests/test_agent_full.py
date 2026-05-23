@@ -5,9 +5,8 @@ from unittest.mock import patch
 
 from agent.budget import IterationBudget
 from agent.loop import AgentLoop
-from config.settings import LLMConfig
+from config.settings import AppConfig, LLMConfig
 from db.session import SessionDB
-from llm.client import LLMClient
 
 
 def test_budget_basic():
@@ -56,8 +55,8 @@ def test_budget_reset():
 
 def test_agent_loop_with_tool_execution():
     """测试完整的工具执行循环"""
-    config = LLMConfig(api_key="sk-test")
-    llm = LLMClient(config)
+    config = AppConfig(llm=LLMConfig(api_key="sk-test"))
+    agent = AgentLoop(config, output_callback=lambda t: None)
 
     # 第一次调用返回工具调用
     tool_call_events = [
@@ -74,14 +73,12 @@ def test_agent_loop_with_tool_execution():
         {"type": "done", "finish_reason": "stop", "content": "命令执行成功", "tool_calls": None},
     ]
 
-    agent = AgentLoop(llm, max_iterations=10, output_callback=lambda t: None)
-
     # 导入工具模块以确保注册
     import tools.terminal
     import importlib
     importlib.reload(tools.terminal)
 
-    with patch.object(llm, "chat_stream", side_effect=[iter(tool_call_events), iter(final_events)]):
+    with patch.object(agent.llm, "chat_stream", side_effect=[iter(tool_call_events), iter(final_events)]):
         result = agent.run("运行命令")
 
     assert result == "命令执行成功"
@@ -91,18 +88,16 @@ def test_agent_loop_with_tool_execution():
 
 def test_agent_loop_with_session_persistence(tmp_path):
     """测试 Agent 循环集成会话持久化"""
-    config = LLMConfig(api_key="sk-test")
-    llm = LLMClient(config)
+    config = AppConfig(llm=LLMConfig(api_key="sk-test"))
     session_db = SessionDB(tmp_path / "test.db")
+    agent = AgentLoop(config, session_db=session_db, output_callback=lambda t: None)
 
     events = [
         {"type": "content_delta", "content": "你好！"},
         {"type": "done", "finish_reason": "stop", "content": "你好！", "tool_calls": None},
     ]
 
-    agent = AgentLoop(llm, max_iterations=10, session_db=session_db, output_callback=lambda t: None)
-
-    with patch.object(llm, "chat_stream", return_value=iter(events)):
+    with patch.object(agent.llm, "chat_stream", return_value=iter(events)):
         result = agent.run("你好")
 
     assert result == "你好！"
@@ -119,9 +114,8 @@ def test_agent_loop_with_session_persistence(tmp_path):
 
 def test_agent_loop_preserves_context_between_runs():
     """测试同一个 AgentLoop 的多次 run 会保留上一轮上下文"""
-    config = LLMConfig(api_key="sk-test")
-    llm = LLMClient(config)
-    agent = AgentLoop(llm, max_iterations=10, output_callback=lambda t: None)
+    config = AppConfig(llm=LLMConfig(api_key="sk-test"))
+    agent = AgentLoop(config, output_callback=lambda t: None)
 
     captured_messages = []
 
@@ -137,7 +131,7 @@ def test_agent_loop_preserves_context_between_runs():
             {"type": "done", "finish_reason": "stop", "content": "知道，您是王当当", "tool_calls": None},
         ])
 
-    with patch.object(llm, "chat_stream", side_effect=fake_chat_stream):
+    with patch.object(agent.llm, "chat_stream", side_effect=fake_chat_stream):
         agent.run("我的名字是王当当，你可以叫我当当大人")
         result = agent.run("现在你知道我是谁了吗？")
 
@@ -154,10 +148,9 @@ def test_agent_loop_preserves_context_between_runs():
 
 def test_agent_loop_reuses_session_across_runs(tmp_path):
     """测试同一个 AgentLoop 的多次 run 写入同一个 SQLite session"""
-    config = LLMConfig(api_key="sk-test")
-    llm = LLMClient(config)
+    config = AppConfig(llm=LLMConfig(api_key="sk-test"))
     session_db = SessionDB(tmp_path / "test.db")
-    agent = AgentLoop(llm, max_iterations=10, session_db=session_db, output_callback=lambda t: None)
+    agent = AgentLoop(config, session_db=session_db, output_callback=lambda t: None)
 
     call_count = 0
 
@@ -170,7 +163,7 @@ def test_agent_loop_reuses_session_across_runs(tmp_path):
             {"type": "done", "finish_reason": "stop", "content": content, "tool_calls": None},
         ])
 
-    with patch.object(llm, "chat_stream", side_effect=fake_chat_stream):
+    with patch.object(agent.llm, "chat_stream", side_effect=fake_chat_stream):
         agent.run("第一轮")
         first_session_id = agent.session_id
         agent.run("第二轮")
@@ -193,9 +186,8 @@ def test_agent_loop_reuses_session_across_runs(tmp_path):
 
 def test_agent_loop_keeps_single_system_prompt_across_runs():
     """测试连续 run 不会重复追加 system prompt"""
-    config = LLMConfig(api_key="sk-test")
-    llm = LLMClient(config)
-    agent = AgentLoop(llm, max_iterations=10, output_callback=lambda t: None)
+    config = AppConfig(llm=LLMConfig(api_key="sk-test"))
+    agent = AgentLoop(config, output_callback=lambda t: None)
 
     def fake_chat_stream(messages, tools=None):
         return iter([
@@ -203,7 +195,7 @@ def test_agent_loop_keeps_single_system_prompt_across_runs():
             {"type": "done", "finish_reason": "stop", "content": "ok", "tool_calls": None},
         ])
 
-    with patch.object(llm, "chat_stream", side_effect=fake_chat_stream):
+    with patch.object(agent.llm, "chat_stream", side_effect=fake_chat_stream):
         agent.run("第一轮")
         agent.run("第二轮")
 
