@@ -9,6 +9,37 @@ from config.settings import load_config, ensure_config_dir
 import tools  # noqa: F401 — 触发工具自注册
 
 
+FIRST_PARTY_LOGGER_NAMES = (
+    "main",
+    "agent",
+    "cli",
+    "config",
+    "context",
+    "db",
+    "llm",
+    "memory",
+    "tools",
+)
+
+
+def configure_logging(log_dir):
+    if not log_dir:
+        return
+
+    log_path = Path(log_dir) / "agent.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    logging.basicConfig(
+        filename=str(log_path),
+        level=logging.WARNING,
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+        force=True,
+    )
+
+    for logger_name in FIRST_PARTY_LOGGER_NAMES:
+        logging.getLogger(logger_name).setLevel(logging.DEBUG)
+
+
 def main():
     """启动 F-Agent"""
     # 加载配置
@@ -24,13 +55,7 @@ def main():
 
     # 配置日志
     log_dir = getattr(config, "log_dir", None)
-    if log_dir:
-        Path(log_dir).mkdir(parents=True, exist_ok=True)
-        logging.basicConfig(
-            filename=f"{log_dir}/agent.log",
-            level=logging.DEBUG,
-            format="%(asctime)s %(name)s %(levelname)s %(message)s",
-        )
+    configure_logging(log_dir)
 
     # 启动 CLI
     cli = CLIInterface(config)
