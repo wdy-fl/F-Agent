@@ -171,10 +171,10 @@ class CLIInterface:
             return
 
         self.console.print("\n[bold]最近会话[/bold]")
-        for s in sessions:
+        for i, s in enumerate(sessions, 1):
             title = s.get("title") or s["id"][:8]
             msg_count = s.get("message_count", 0)
-            self.console.print(f"  {s['id']}  {title} ({msg_count} 条消息)")
+            self.console.print(f"  [bold cyan]{i}[/bold cyan]. {s['id']}  {title} ({msg_count} 条消息)")
         self.console.print()
 
     def _show_stats(self) -> None:
