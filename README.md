@@ -37,17 +37,15 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# 配置 API Key
+# 创建配置文件
 mkdir -p workspace
-cat > workspace/config.yaml << 'EOF'
-llm:
-  api_key: "your-key"
-  base_url: "https://api.deepseek.com"
-  model: "deepseek-v4-pro"
-EOF
+cp config.yaml.example workspace/config.yaml
 
 # 启动阿福
 python3 main.py
+# 或使用启动脚本（自动激活虚拟环境）
+./start.sh          # macOS / Linux
+./start.ps1         # Windows PowerShell
 ```
 
 ## 项目结构
