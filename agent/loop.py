@@ -75,6 +75,9 @@ class AgentLoop:
         self.budget.reset()
         logger.debug("预算已重置, max_iterations=%d", self.max_iterations)
 
+        self._ensure_conversation_started(user_message)
+        logger.debug("会话已初始化, session_id=%s", self.session_id)
+
         # 预取记忆并注入到用户消息
         enhanced_message = user_message
         if self.memory_manager:
@@ -83,9 +86,6 @@ class AgentLoop:
             if memory_context:
                 enhanced_message = inject_context(user_message, memory_context)
                 logger.debug("记忆上下文已注入, length=%d", len(memory_context))
-
-        self._ensure_conversation_started(user_message)
-        logger.debug("会话已初始化, session_id=%s", self.session_id)
 
         user_msg = {"role": "user", "content": enhanced_message}
         self.messages.append(user_msg)
