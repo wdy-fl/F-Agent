@@ -3,6 +3,7 @@
 import logging
 from typing import Any
 
+import httpx
 from openai import OpenAI
 
 from config.settings import LLMConfig
@@ -20,6 +21,12 @@ class LLMClient:
         }
         if config.base_url:
             kwargs["base_url"] = config.base_url
+        kwargs["timeout"] = httpx.Timeout(
+            connect=10.0,
+            read=config.request_timeout,
+            write=30.0,
+            pool=5.0,
+        )
         self.client = OpenAI(**kwargs)
         self._total_input_tokens = 0
         self._total_output_tokens = 0
@@ -77,74 +84,94 @@ class LLMClient:
         if tools:
             kwargs["tools"] = tools
 
-        stream = self.client.chat.completions.create(**kwargs)
-
         tool_calls_accum: dict[int, dict[str, Any]] = {}
         current_content = ""
         current_reasoning = ""
         usage = None
 
-        for chunk in stream:
-            # 捕获 usage（DeepSeek 流式最后一个 chunk 在顶层带 usage）
-            if hasattr(chunk, 'usage') and chunk.usage:
-                usage = {
-                    "prompt_tokens": chunk.usage.prompt_tokens,
-                    "completion_tokens": chunk.usage.completion_tokens,
-                }
-                self._total_input_tokens += chunk.usage.prompt_tokens
-                self._total_output_tokens += chunk.usage.completion_tokens
+        try:
+            stream = self.client.chat.completions.create(**kwargs)
+        except Exception as e:
+            logger.error("LLM API 调用失败: %s", e)
+            yield {
+                "type": "done",
+                "finish_reason": "error",
+                "content": f"API 调用失败：{e}",
+            }
+            return
 
-            if not chunk.choices:
-                continue
+        try:
+            for chunk in stream:
+                # 捕获 usage（DeepSeek 流式最后一个 chunk 在顶层带 usage）
+                if hasattr(chunk, 'usage') and chunk.usage:
+                    usage = {
+                        "prompt_tokens": chunk.usage.prompt_tokens,
+                        "completion_tokens": chunk.usage.completion_tokens,
+                    }
+                    self._total_input_tokens += chunk.usage.prompt_tokens
+                    self._total_output_tokens += chunk.usage.completion_tokens
 
-            delta = chunk.choices[0].delta
+                if not chunk.choices:
+                    continue
 
-            # 文本内容增量
-            if delta.content:
-                current_content += delta.content
-                yield {"type": "content_delta", "content": delta.content}
+                delta = chunk.choices[0].delta
 
-            # reasoning_content 增量拼接
-            if getattr(delta, 'reasoning_content', None):
-                current_reasoning += delta.reasoning_content
+                # 文本内容增量
+                if delta.content:
+                    current_content += delta.content
+                    yield {"type": "content_delta", "content": delta.content}
 
-            # tool_calls 增量拼接
-            if delta.tool_calls:
-                for tc_delta in delta.tool_calls:
-                    idx = tc_delta.index
-                    if idx not in tool_calls_accum:
-                        tool_calls_accum[idx] = {
-                            "id": "",
-                            "type": "function",
-                            "function": {"name": "", "arguments": ""},
-                        }
-                    acc = tool_calls_accum[idx]
-                    if tc_delta.id:
-                        acc["id"] = tc_delta.id
-                    if tc_delta.function:
-                        if tc_delta.function.name:
-                            acc["function"]["name"] += tc_delta.function.name
-                        if tc_delta.function.arguments:
-                            acc["function"]["arguments"] += tc_delta.function.arguments
+                # reasoning_content 增量拼接
+                if getattr(delta, 'reasoning_content', None):
+                    current_reasoning += delta.reasoning_content
+                    yield {"type": "reasoning_delta", "content": delta.reasoning_content}
 
-            # 流结束
-            if chunk.choices[0].finish_reason:
-                result: dict[str, Any] = {
-                    "type": "done",
-                    "finish_reason": chunk.choices[0].finish_reason,
-                    "content": current_content,
-                }
-                if tool_calls_accum:
-                    result["tool_calls"] = [
-                        tool_calls_accum[i]
-                        for i in sorted(tool_calls_accum.keys())
-                    ]
-                if current_reasoning:
-                    result["reasoning_content"] = current_reasoning
-                if usage:
-                    result["usage"] = usage
-                yield result
-                return
+                # tool_calls 增量拼接
+                if delta.tool_calls:
+                    for tc_delta in delta.tool_calls:
+                        idx = tc_delta.index
+                        if idx not in tool_calls_accum:
+                            tool_calls_accum[idx] = {
+                                "id": "",
+                                "type": "function",
+                                "function": {"name": "", "arguments": ""},
+                            }
+                        acc = tool_calls_accum[idx]
+                        if tc_delta.id:
+                            acc["id"] = tc_delta.id
+                        if tc_delta.function:
+                            if tc_delta.function.name:
+                                acc["function"]["name"] += tc_delta.function.name
+                            if tc_delta.function.arguments:
+                                acc["function"]["arguments"] += tc_delta.function.arguments
+
+                # 流结束
+                if chunk.choices[0].finish_reason:
+                    result: dict[str, Any] = {
+                        "type": "done",
+                        "finish_reason": chunk.choices[0].finish_reason,
+                        "content": current_content,
+                    }
+                    if tool_calls_accum:
+                        result["tool_calls"] = [
+                            tool_calls_accum[i]
+                            for i in sorted(tool_calls_accum.keys())
+                        ]
+                    if current_reasoning:
+                        result["reasoning_content"] = current_reasoning
+                    if usage:
+                        result["usage"] = usage
+                    yield result
+                    return
+        except Exception as e:
+            logger.error("LLM 流式连接异常: %s", e)
+            yield {
+                "type": "done",
+                "finish_reason": "error",
+                "content": f"连接异常：{e}",
+                "reasoning_content": current_reasoning if current_reasoning else None,
+            }
+            return
 
         # 兜底：流异常结束
         result_fallback: dict[str, Any] = {

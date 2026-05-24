@@ -110,7 +110,12 @@ class AgentLoop:
 
             # 调用 LLM（流式）
             logger.debug("正在调用 LLM 流式接口")
-            response = self._call_llm_stream(tools=tools if tools else None)
+            try:
+                response = self._call_llm_stream(tools=tools if tools else None)
+            except Exception as e:
+                logger.error("LLM 调用未预期异常: %s", e, exc_info=True)
+                self.output_callback(f"\n[错误] LLM 调用失败：{e}\n")
+                return f"抱歉，调用模型时遇到错误：{e}"
             logger.debug("LLM 响应已收到, content=%s, has_tool_calls=%s, finish_reason=%s",
                          response.get("content", ""),
                          bool(response.get("tool_calls")),
@@ -236,6 +241,8 @@ class AgentLoop:
             if event["type"] == "content_delta":
                 content_parts.append(event["content"])
                 self.output_callback(event["content"])
+            elif event["type"] == "reasoning_delta":
+                self.output_callback(event["content"])
             elif event["type"] == "done":
                 tool_calls = event.get("tool_calls")
                 finish_reason = event.get("finish_reason", "stop")
@@ -244,6 +251,14 @@ class AgentLoop:
 
         full_content = "".join(content_parts)
         self.output_callback("\n")
+
+        # 错误响应不追加到消息历史
+        if finish_reason == "error":
+            return {
+                "content": full_content,
+                "tool_calls": None,
+                "finish_reason": "error",
+            }
 
         # 构造助手消息并追加
         assistant_msg: dict[str, Any] = {"role": "assistant", "content": full_content}

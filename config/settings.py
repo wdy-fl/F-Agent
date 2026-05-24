@@ -23,6 +23,7 @@ class LLMConfig:
     context_window: int = 128000
     max_iterations: int = 50
     temperature: float = 0.7
+    request_timeout: float = 120.0
 
 
 @dataclass
