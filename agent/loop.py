@@ -71,10 +71,6 @@ class AgentLoop:
         """
         logger.info("=== run 开始, user_message=%r", user_message[:80])
 
-        # 初始化预算
-        self.budget.reset()
-        logger.debug("预算已重置, max_iterations=%d", self.max_iterations)
-
         self._ensure_conversation_started(user_message)
         logger.debug("会话已初始化, session_id=%s", self.session_id)
 
@@ -100,6 +96,10 @@ class AgentLoop:
         # 获取工具定义
         tools = registry.get_definitions()
         logger.debug("工具定义已加载, count=%d", len(tools))
+
+        # 初始化预算，进入主循环
+        self.budget.reset()
+        logger.debug("预算已重置, max_iterations=%d", self.max_iterations)
 
         # 主循环
         while self.budget.can_continue():
