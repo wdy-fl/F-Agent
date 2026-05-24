@@ -179,7 +179,8 @@ class CLIInterface:
                 reasoning = msg.get("reasoning_content", "")
                 if reasoning:
                     self.console.print(f"[dim]  (思考: {reasoning})[/dim]")
-                self.console.print(f"[bold green]阿福:[/bold green] {content}")
+                self.console.print("[bold green]阿福:[/bold green]")
+                self.console.print(Markdown(content))
             elif role == "tool":
                 tool_name = msg.get("tool_call_id", "") or "tool"
                 preview = content[:200] + "..." if len(content) > 200 else content
