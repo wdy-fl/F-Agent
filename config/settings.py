@@ -38,6 +38,16 @@ class MemoryConfig:
 
 
 @dataclass
+class MySQLConfig:
+    """MySQL 连接配置（只读查询）"""
+    host: str = "127.0.0.1"
+    port: int = 3306
+    user: str = "root"
+    database: str = ""
+    password_env: str = "MYSQL_PASSWORD"
+
+
+@dataclass
 class CompressorConfig:
     """上下文压缩配置"""
     threshold: float = 0.5
@@ -53,6 +63,7 @@ class AppConfig:
     tools: ToolConfig = field(default_factory=ToolConfig)
     memory: MemoryConfig = field(default_factory=MemoryConfig)
     compressor: CompressorConfig = field(default_factory=CompressorConfig)
+    mysql: MySQLConfig | None = None
     db_path: str = str(DEFAULT_DB_PATH)
     user_profile_path: str = str(DEFAULT_USER_PROFILE_PATH)
     skills_dir: str = str(DEFAULT_SKILLS_DIR)
@@ -86,12 +97,14 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
     tools_dict = config_dict.pop("tools", {})
     memory_dict = config_dict.pop("memory", {})
     compressor_dict = config_dict.pop("compressor", {})
+    mysql_dict = config_dict.pop("mysql", None)
 
     return AppConfig(
         llm=LLMConfig(**llm_dict),
         tools=ToolConfig(**tools_dict),
         memory=MemoryConfig(**memory_dict),
         compressor=CompressorConfig(**compressor_dict),
+        mysql=MySQLConfig(**mysql_dict) if mysql_dict else None,
         **config_dict,
     )
 

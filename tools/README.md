@@ -9,6 +9,8 @@
 | file_ops.py | 文件读写 + 列目录 |
 | web_search.py | Web 搜索 + 网页抓取 |
 | memory.py | 记忆读写/画像更新（供 LLM 调用） |
+| mysql.py | MySQL 只读查询（供 LLM 调用） |
+| think.py | 中间思考保存，驱动 ReAct 循环 |
 | skill.py | 技能管理（供 LLM 调用） |
 
 ## 注册方式
