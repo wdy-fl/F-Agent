@@ -164,6 +164,27 @@ class CLIInterface:
             f"已恢复会话 {session_id}（{restored_count} 条历史消息）",
             style="green",
         )
+        non_system = [m for m in self.agent.messages if m.get("role") != "system"]
+        self._print_conversation(non_system)
+
+    def _print_conversation(self, messages: list[dict]) -> None:
+        """打印对话历史到终端。"""
+        self.console.print("\n[bold]--- 历史对话 ---[/bold]")
+        for msg in messages:
+            role = msg.get("role", "")
+            content = msg.get("content", "") or ""
+            if role == "user":
+                self.console.print(f"\n[bold cyan]你:[/bold cyan] {content}")
+            elif role == "assistant":
+                reasoning = msg.get("reasoning_content", "")
+                if reasoning:
+                    self.console.print(f"[dim]  (思考: {reasoning})[/dim]")
+                self.console.print(f"[bold green]阿福:[/bold green] {content}")
+            elif role == "tool":
+                tool_name = msg.get("tool_call_id", "") or "tool"
+                preview = content[:200] + "..." if len(content) > 200 else content
+                self.console.print(f"[dim]  [工具: {tool_name}] {preview}[/dim]")
+        self.console.print("\n[bold]--- 以上为历史对话 ---[/bold]\n")
 
     def _list_sessions(self) -> None:
         """列出历史会话"""
