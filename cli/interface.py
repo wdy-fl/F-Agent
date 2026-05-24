@@ -121,6 +121,8 @@ class CLIInterface:
             self._print_banner()
         elif cmd == "/sessions":
             self._list_sessions()
+        elif cmd == "/resume":
+            self._resume_interactive()
         elif cmd.startswith("/resume "):
             session_id = command.strip().split(maxsplit=1)[1]
             self._resume_session(session_id)
@@ -147,7 +149,7 @@ class CLIInterface:
         self.console.print("  /quit     - 退出程序")
         self.console.print("  /clear    - 清屏")
         self.console.print("  /sessions - 列出历史会话")
-        self.console.print("  /resume <id> - 恢复历史会话")
+        self.console.print("  /resume [id] - 恢复历史会话（无参数时交互选择）")
         self.console.print("  /stats    - 显示当前会话统计")
         self.console.print()
 
@@ -176,6 +178,32 @@ class CLIInterface:
             msg_count = s.get("message_count", 0)
             self.console.print(f"  [bold cyan]{i}[/bold cyan]. {s['id']}  {title} ({msg_count} 条消息)")
         self.console.print()
+
+    def _resume_interactive(self) -> None:
+        """无参数 /resume：展示会话列表并交互式选择恢复。"""
+        sessions = self.session_db.list_sessions(limit=10)
+        if not sessions:
+            self.console.print("暂无历史会话", style="dim")
+            return
+
+        self.console.print("\n[bold]选择要恢复的会话（输入序号）[/bold]")
+        for i, s in enumerate(sessions, 1):
+            title = s.get("title") or s["id"][:8]
+            msg_count = s.get("message_count", 0)
+            self.console.print(f"  [bold cyan]{i}[/bold cyan]. {title} ({msg_count} 条消息)")
+
+        try:
+            choice = self.prompt_session.prompt("\n序号: ").strip()
+            idx = int(choice) - 1
+            if idx < 0 or idx >= len(sessions):
+                self.console.print("无效的序号", style="red")
+                return
+        except (ValueError, EOFError, KeyboardInterrupt):
+            self.console.print("已取消", style="yellow")
+            return
+
+        session_id = sessions[idx]["id"]
+        self._resume_session(session_id)
 
     def _show_stats(self) -> None:
         """显示当前会话统计"""
