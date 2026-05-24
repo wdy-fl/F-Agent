@@ -32,25 +32,38 @@
 
 ### Phase 1 — 最小可运行 Agent（MVP）
 
-构建一个能对话、能调用工具的基础 Agent：
+> ✅ 已完成
 
-- Agent 主循环：LLM API 调用 + 工具调用迭代
-- 基础工具集：终端执行、文件读写、Web 搜索
-- CLI 交互界面
-- 会话持久化（SQLite）
+- 基础设施搭建：`config/settings.py` + `llm/client.py`
+- 工具系统：`tools/registry.py` + `terminal.py` + `file_ops.py` + `web_search.py`
+- 会话持久化（含 FTS5）：`db/schema.py` + `db/session.py`
+- Agent 核心：`agent/loop.py` + `agent/prompt.py` + `agent/budget.py`
+- CLI 界面：`cli/interface.py` + `main.py`
 
-### Phase 2 — 记忆与技能
+### Phase 2 — 记忆与用户建模
 
-让 Agent 拥有记忆和自改进能力：
+> ✅ 已完成
 
-- 持久化记忆系统
-- 会话搜索与跨会话召回
-- 技能自动创建与生命周期管理
-- 上下文压缩
+- 记忆基础设施：FTS5 全文索引 + 自动同步触发器 + `memory/context_fence.py`
+- 记忆管理器：`memory/manager.py`（prefetch + sync）
+- 用户建模：`memory/user_profile.py` + `tools/memory.py`
+- 上下文压缩：`context/compressor.py`（工具结果裁剪 + LLM 结构化摘要 + 头尾保护）
 
-### Phase 3 — 多平台与扩展
+### Phase 3 — 技能系统
 
-让 Agent 无处不在、可无限扩展：
+1. **技能加载**
+   - `skills/loader.py`：SKILL.md 解析 + 索引构建
+   - 技能注入到系统提示词
+
+2. **技能管理工具**
+   - `tools/skill.py`：创建/编辑/查询技能
+
+3. **技能策展**
+   - `skills/curator.py`：自动创建 + 生命周期管理 + 自改进
+
+**交付标准**：阿福能从经验中创建技能，技能随使用自改进，完整生命周期流转。
+
+### Phase 4 — 多平台与扩展
 
 - 多平台消息网关（Telegram / Discord / Web）
 - 子 Agent 委托与并行执行
@@ -58,7 +71,7 @@
 - 定时任务调度
 - MCP 协议支持
 
-### Phase 4 — 高级特性
+### Phase 5 — 高级特性
 
 - 多环境执行后端
 - Web Dashboard
