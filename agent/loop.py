@@ -80,12 +80,13 @@ class AgentLoop:
             logger.debug("正在预取记忆上下文")
             memory_context = self.memory_manager.prefetch(user_message)
             if memory_context:
+                logger.debug("记忆上下文内容: %s", memory_context)
                 enhanced_message = inject_context(user_message, memory_context)
-                logger.debug("记忆上下文已注入, length=%d", len(memory_context))
+                logger.debug("注入后完整消息: %s", enhanced_message)
 
         user_msg = {"role": "user", "content": enhanced_message}
         self.messages.append(user_msg)
-        logger.debug("用户消息已追加, messages count=%d", len(self.messages))
+        logger.debug("用户消息已追加: %s", user_msg)
 
         if self.session_db and self.session_id:
             # DB 存储原始用户消息，不含记忆上下文，保证搜索干净
@@ -95,23 +96,23 @@ class AgentLoop:
 
         # 获取工具定义
         tools = registry.get_definitions()
-        logger.debug("工具定义已加载, count=%d", len(tools))
+        logger.debug("工具定义已加载: %s", tools)
 
         # 初始化预算，进入主循环
         self.budget.reset()
-        logger.debug("预算已重置, max_iterations=%d", self.max_iterations)
+        logger.debug("ReAct循环轮数已重置, 轮数限制=%d轮", self.max_iterations)
 
         # 主循环
         while self.budget.can_continue():
             self.budget.consume()
-            logger.info("循环迭代 剩余%d/%d, messages count=%d",
+            logger.info("本次ReAct循环剩余轮数 %d/%d, 消息列表长度=%d",
                         self.budget.remaining, self.max_iterations, len(self.messages))
 
             # 调用 LLM（流式）
             logger.debug("正在调用 LLM 流式接口")
             response = self._call_llm_stream(tools=tools if tools else None)
-            logger.debug("LLM 响应已收到, content_length=%d, has_tool_calls=%s, finish_reason=%s",
-                         len(response.get("content", "")),
+            logger.debug("LLM 响应已收到, content=%s, has_tool_calls=%s, finish_reason=%s",
+                         response.get("content", ""),
                          bool(response.get("tool_calls")),
                          response.get("finish_reason"))
 
@@ -133,11 +134,11 @@ class AgentLoop:
                 self._persist_assistant_message(response)
                 result = response.get("content", "")
                 self._sync_memory(user_message, result)
-                logger.info("=== run 结束, 无工具调用, result_length=%d", len(result))
+                logger.info("=== run 结束, 无工具调用, result=%s", result)
                 return result
 
             # 有工具调用 → 执行工具
-            logger.info("正在执行 %d 个工具调用", len(response["tool_calls"]))
+            logger.info("正在执行工具调用: %s", response["tool_calls"])
             self._persist_assistant_message(response)
             tool_results = self._execute_tool_calls(response["tool_calls"])
             self.messages.extend(tool_results)
@@ -156,7 +157,7 @@ class AgentLoop:
                     self.session_id,
                     tool_call_count=len(response["tool_calls"]),
                 )
-                logger.debug("工具结果已持久化, count=%d", len(tool_results))
+                logger.debug("工具结果已持久化: %s", tool_results)
 
             # 检查是否需要上下文压缩
             if self.compressor:
@@ -166,7 +167,7 @@ class AgentLoop:
         logger.warning("预算已耗尽, max_iterations=%d, 进入兜底调用", self.max_iterations)
         result = self._grace_call()
         self._sync_memory(user_message, result)
-        logger.info("=== run 结束, 兜底调用完成, result_length=%d", len(result))
+        logger.info("=== run 结束, 兜底调用完成, result=%s", result)
         return result
 
     def restore_session(self, session_id: str) -> int:
