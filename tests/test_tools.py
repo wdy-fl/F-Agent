@@ -183,6 +183,59 @@ def test_terminal_tool():
     assert "hello" in parsed["stdout"]
 
 
+def test_terminal_blocks_dangerous_without_callback():
+    """无回调时危险命令被拒绝"""
+    from tools.approval import set_approval_callback, set_approval_context
+    _clean_registry()
+    import tools.terminal
+    importlib.reload(tools.terminal)
+
+    set_approval_callback(None)
+    set_approval_context(mode="manual")
+
+    result = global_registry.dispatch("terminal", {"command": "rm -rf /tmp/test"})
+    parsed = json.loads(result)
+    assert parsed["exit_code"] == -1
+    assert parsed["stdout"] == ""
+
+
+def test_terminal_blocks_hardline_with_callback():
+    """硬限制命令即使有回调也被阻止"""
+    from tools.approval import set_approval_callback, set_approval_context
+    _clean_registry()
+    import tools.terminal
+    importlib.reload(tools.terminal)
+
+    def approve_cb(cmd, desc, key):
+        return "once"
+
+    set_approval_callback(approve_cb)
+    set_approval_context(mode="manual")
+
+    result = global_registry.dispatch("terminal", {"command": "shutdown --help"})
+    parsed = json.loads(result)
+    assert parsed["exit_code"] == -1
+
+
+def test_terminal_dangerous_allowed_with_callback():
+    """有回调且批准时危险命令可执行"""
+    from tools.approval import set_approval_callback, set_approval_context
+    _clean_registry()
+    import tools.terminal
+    importlib.reload(tools.terminal)
+
+    def approve_cb(cmd, desc, key):
+        return "once"
+
+    set_approval_callback(approve_cb)
+    set_approval_context(mode="manual")
+
+    # "rm -rf --help" matches dangerous pattern but is harmless to execute
+    result = global_registry.dispatch("terminal", {"command": "rm -rf --help"})
+    parsed = json.loads(result)
+    assert parsed["exit_code"] != -1 or "block" not in parsed.get("stderr", "")
+
+
 def test_file_ops_tools(tmp_path):
     """测试文件操作工具"""
     _clean_registry()
