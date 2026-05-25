@@ -4,6 +4,7 @@ import json
 import subprocess
 
 from tools.registry import registry
+from tools.approval import check_all_guards
 
 
 def run_terminal(args: dict) -> str:
@@ -20,6 +21,14 @@ def run_terminal(args: dict) -> str:
 
     if not command:
         return json.dumps({"error": "No command provided"}, ensure_ascii=False)
+
+    approval = check_all_guards(command)
+    if not approval["approved"]:
+        return json.dumps({
+            "exit_code": -1,
+            "stdout": "",
+            "stderr": approval["message"],
+        }, ensure_ascii=False)
 
     try:
         result = subprocess.run(
