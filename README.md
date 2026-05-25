@@ -19,7 +19,7 @@
 | 智能对话 | 接入多种 LLM，模型可随时切换 |
 | 工具调用 | 内置终端执行、文件操作、Web 搜索等工具，支持 MCP 协议扩展 |
 | 持久记忆 | 跨会话记忆用户偏好与历史上下文，支持全文搜索召回 |
-| 技能自创 | 完成复杂任务后自动提炼可复用技能，技能随使用自我优化 |
+| 技能自创 | 完成复杂任务后主动提议提炼可复用技能，渐进式披露在对话中复用 |
 | 上下文压缩 | 长对话自动压缩，在有限 Token 窗口内保持连贯性 |
 | 多平台接入 | 统一消息网关，同一 Agent 同时服务 CLI / Telegram / Web 等多端 |
 | 并行委托 | 将子任务派生给独立 Agent 并行执行，汇总结果 |
@@ -56,17 +56,31 @@ F-Agent/
 ├── agent/               # Agent 核心
 │   ├── loop.py          # 主循环
 │   ├── prompt.py        # 提示词构建
-│   ├── context.py       # 上下文压缩
-│   └── memory.py        # 记忆管理
+│   └── budget.py        # 预算控制
 ├── tools/               # 工具集
 │   ├── registry.py      # 工具注册表
 │   ├── terminal.py      # 终端执行
-│   ├── file.py          # 文件操作
-│   └── web.py           # Web 搜索
-├── skills/              # 技能库
-├── gateway/             # 多平台消息网关
+│   ├── file_ops.py      # 文件操作
+│   ├── web_search.py    # Web 搜索
+│   ├── memory.py        # 记忆读写
+│   └── skill.py         # 技能管理
+├── memory/              # 记忆子系统
+│   ├── manager.py       # 记忆管理器
+│   ├── user_profile.py  # 用户画像
+│   └── context_fence.py # 上下文围栏
+├── skills/              # 技能系统
+│   ├── loader.py        # 技能扫描与索引
+│   └── skill_utils.py   # 共享工具
+├── context/             # 上下文压缩
+│   └── compressor.py
 ├── db/                  # 会话持久化
+│   ├── session.py
+│   └── schema.py
 ├── config/              # 配置管理
+│   └── settings.py
+├── workspace/           # 运行时数据
+│   ├── config.yaml
+│   └── skills/          # 技能库
 └── tests/               # 测试
 ```
 

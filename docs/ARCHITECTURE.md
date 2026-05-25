@@ -16,7 +16,7 @@
 | 工具调用 | 自注册工具系统，内置终端/文件/Web/记忆/技能等工具 |
 | 持久记忆 | SQLite + FTS5 存储对话历史，支持全文搜索召回 |
 | 用户建模 | USER.md 自动维护用户画像，LLM 驱动更新 |
-| 技能系统 | 从经验自动创建技能，技能随使用自改进，完整生命周期管理 |
+| 技能系统 | 从经验中创建技能并复用，渐进式披露注入系统提示词 |
 | 上下文压缩 | 工具结果裁剪 + LLM 结构化摘要 + 头尾保护 |
 
 ### 1.3 设计决策
@@ -26,7 +26,7 @@
 | 使用场景 | 本地 CLI 助手 | 聚焦核心能力，暂不需要多平台网关 |
 | LLM SDK | 仅 OpenAI SDK | 通过 base_url 可兼容大多数模型，避免多 SDK 适配复杂度 |
 | 记忆 | 会话记忆 + FTS5 搜索 + 用户建模 | 完整记忆能力，支持跨会话召回和个性化 |
-| 技能 | 完整技能系统 | 这是阿福"可进化"的核心，包含自动创建和自改进 |
+| 技能 | 简化技能系统 | 前台 Agent 主动创建，渐进式披露，不含生命周期管理 |
 | 数据库 | SQLite（WAL + FTS5） | 零部署、高性能、可移植，Python 标准库自带 |
 | 架构风格 | 分层模块架构 | 职责清晰，每层可独立开发测试 |
 
@@ -67,12 +67,8 @@ F-Agent/
 │   ├── user_profile.py        # 用户建模：USER.md 读写 + LLM 驱动更新
 │   └── context_fence.py       # 上下文围栏：<memory-context> 标签注入/剥离
 ├── skills/
-│   ├── loader.py              # 技能加载：扫描 SKILL.md → 解析 frontmatter
-│   ├── curator.py             # 技能策展：自动创建 + 生命周期管理 + 自改进
-│   └── builtin/               # 内置技能目录
-│       └── <category>/
-│           └── <skill>/
-│               └── SKILL.md
+│   ├── loader.py              # 技能加载：扫描 SKILL.md → 解析 frontmatter → 构建索引
+│   └── skill_utils.py         # 技能工具：frontmatter 解析、名称校验、路径解析
 ├── context/
 │   └── compressor.py          # 上下文压缩：工具结果裁剪 + LLM 摘要 + 头尾保护
 ├── db/
@@ -91,7 +87,7 @@ F-Agent/
 
 - **AIAgent 不做上帝类** — 拆成 loop.py（流程控制）、prompt.py（提示词构建）、budget.py（预算控制），各自 < 300 行
 - **记忆与工具解耦** — 记忆是独立子系统，tools/memory.py 只是对 LLM 暴露的调用入口
-- **技能与 Agent 解耦** — skills/curator.py 是后台服务，不在主循环热路径上
+- **技能与 Agent 解耦** — skills/ 是独立的加载和工具模块，通过 tools/skill.py 供 Agent 调用
 
 ## 3. Agent 主循环
 
@@ -115,8 +111,7 @@ F-Agent/
    │   └── 无工具调用 → 返回最终回复
    └── 后处理：
        ├── 同步记忆（user_msg + assistant_msg）
-       ├── 检查是否需要上下文压缩
-       └── 技能策展检查（完成复杂任务后）
+       └── 检查是否需要上下文压缩
 
 3. 返回最终回复
 ```
@@ -188,6 +183,8 @@ workspace/skills/
       SKILL.md          # 必需：YAML frontmatter + Markdown 指令
       references/       # 可选：参考资料
       templates/        # 可选：文件模板
+      scripts/          # 可选：脚本
+      assets/           # 可选：附件
 ```
 
 ### 5.2 SKILL.md 格式
@@ -196,13 +193,10 @@ workspace/skills/
 ---
 name: python-testing
 description: "Use when writing Python tests. Covers pytest fixtures, mocking, and coverage."
-version: 1.0.0
-category: software-development
+category: dev
 tags: [python, testing, pytest]
-lifecycle: active       # active → stale → archived
 created_at: 2025-05-13
 updated_at: 2025-05-13
-usage_count: 0
 ---
 # Python Testing Skill
 ## When to Use
@@ -211,36 +205,28 @@ usage_count: 0
 ...
 ```
 
-### 5.3 技能生命周期
+### 5.3 创建机制
 
-```
-[Agent 完成复杂任务]
-      ↓
-[curator 判断是否值得创建技能]
-      ↓ active
-[技能在对话中被引用 → usage_count++]
-      ↓
-[长时间未用 → lifecycle: stale]
-      ↓
-[再次使用 → lifecycle: active，触发自改进]
-      ↓
-[持续未用 → lifecycle: archived]
-```
+Agent 通过系统提示词引导，在以下情况主动提议创建技能（需用户确认）：
+- 完成复杂任务（5+ 次工具调用）
+- 克服棘手错误并找到解决方案
+- 用户纠正过的做法最终生效
+- 发现非平凡的工作流程
+- 用户明确要求"记住这个做法"
 
-- 技能不会自动删除，只做状态流转
-- archived 技能不注入系统提示词，但可通过搜索召回
+创建操作由 `skill_manage(action='create')` 工具完成，写入 `workspace/skills/`。
 
-### 5.4 自改进机制
+### 5.4 技能注入方式
 
-- 技能被引用时，curator 评估当前指令与实际使用效果的差距
-- 如果发现技能指令不精确或过时，LLM 重写 SKILL.md 的 Instructions 部分
-- 版本号自增，updated_at 更新
+采用渐进式披露：启动时扫描技能目录构建索引，系统提示词注入 `<available_skills>` 列表（仅 name + description）。Agent 判断相关时通过 `skill_view(name)` 按需加载完整 SKILL.md 内容。
 
-### 5.5 技能注入方式
+### 5.5 工具
 
-- 会话启动时扫描 `workspace/skills/`，构建技能索引
-- 技能描述（name + description）注入系统提示词的技能索引区
-- 匹配到的技能全文指令注入系统提示词
+| 工具 | 用途 |
+|------|------|
+| skills_list | 列出所有可用技能 |
+| skill_view | 加载技能完整内容或关联文件 |
+| skill_manage | 创建/编辑/删除技能或关联文件（create/edit/delete/write_file/remove_file） |
 
 ## 6. 上下文压缩
 
@@ -335,7 +321,9 @@ registry.dispatch(name, args) → handler → result
 | web_search | Web 搜索 | 是 |
 | web_fetch | 抓取网页内容 | 是 |
 | memory | 记忆读写/画像更新 | 否 |
-| skill | 技能管理 | 否 |
+| skills_list | 列出技能 | 是 |
+| skill_view | 加载技能内容 | 是 |
+| skill_manage | 技能管理（创建/编辑/删除） | 否 |
 
 ## 8. 数据存储
 
