@@ -11,6 +11,7 @@ from rich.text import Text
 
 from agent.loop import AgentLoop
 from config.settings import AppConfig, ensure_config_dir
+from tools.approval import set_approval_callback, set_approval_context
 from db.session import SessionDB
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,8 @@ class CLIInterface:
         # 中断标志
         self._interrupted = False
 
+        set_approval_callback(self._approval_callback)
+
     def run(self) -> None:
         """启动 CLI 交互循环"""
         self._print_banner()
@@ -73,6 +76,10 @@ class CLIInterface:
                 with Live(Text(""), console=self.console, transient=False, refresh_per_second=15) as live:
                     self._live = live
                     try:
+                        set_approval_context(
+                            mode=self.config.approval.mode,
+                            session_id=self.agent.session_id,
+                        )
                         result = self.agent.run(user_input)
                     except KeyboardInterrupt:
                         self.agent.budget.interrupt()
@@ -102,6 +109,42 @@ class CLIInterface:
         self._stream_buffer += text
         if self._live:
             self._live.update(Text(self._stream_buffer))
+
+    def _approval_callback(self, command: str, description: str, pattern_key: str) -> str:
+        """审批回调：展示危险命令面板，获取用户选择。
+
+        Returns:
+            "once" | "session" | "deny"
+        """
+        from rich.panel import Panel
+        from rich.text import Text
+
+        text = Text()
+        text.append("危险命令\n\n", style="bold yellow")
+        text.append(f"命令: ", style="dim")
+        text.append(f"{command}\n", style="white")
+        text.append(f"原因: ", style="dim")
+        text.append(f"{description}\n\n", style="white")
+        text.append("[o] 本次允许  (once)\n", style="green")
+        text.append("[s] 会话记住  (session)\n", style="cyan")
+        text.append("[d] 拒绝      (deny)\n", style="red")
+
+        panel = Panel(text, title="命令审批", border_style="yellow")
+        self.console.print(panel)
+
+        while True:
+            try:
+                choice = self.prompt_session.prompt("请选择 (o/s/d): ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                return "deny"
+
+            if choice in ("o", "once"):
+                return "once"
+            if choice in ("s", "session"):
+                return "session"
+            if choice in ("d", "deny"):
+                return "deny"
+            self.console.print("无效选择，请输入 o/s/d", style="red")
 
     def _handle_command(self, command: str) -> bool:
         """处理斜杠命令
