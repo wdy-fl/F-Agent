@@ -58,12 +58,19 @@ class CompressorConfig:
 
 
 @dataclass
+class ApprovalConfig:
+    """命令审批配置"""
+    mode: str = "manual"   # "manual" | "off"
+
+
+@dataclass
 class AppConfig:
     """应用全局配置"""
     llm: LLMConfig = field(default_factory=LLMConfig)
     tools: ToolConfig = field(default_factory=ToolConfig)
     memory: MemoryConfig = field(default_factory=MemoryConfig)
     compressor: CompressorConfig = field(default_factory=CompressorConfig)
+    approval: ApprovalConfig = field(default_factory=ApprovalConfig)
     mysql: MySQLConfig | None = None
     db_path: str = str(DEFAULT_DB_PATH)
     user_profile_path: str = str(DEFAULT_USER_PROFILE_PATH)
@@ -98,6 +105,7 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
     tools_dict = config_dict.pop("tools", {})
     memory_dict = config_dict.pop("memory", {})
     compressor_dict = config_dict.pop("compressor", {})
+    approval_dict = config_dict.pop("approvals", {})
     mysql_dict = config_dict.pop("mysql", None)
 
     return AppConfig(
@@ -106,6 +114,7 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
         memory=MemoryConfig(**memory_dict),
         compressor=CompressorConfig(**compressor_dict),
         mysql=MySQLConfig(**mysql_dict) if mysql_dict else None,
+        approval=ApprovalConfig(**approval_dict) if approval_dict else ApprovalConfig(),
         **config_dict,
     )
 
