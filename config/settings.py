@@ -105,7 +105,7 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
     tools_dict = config_dict.pop("tools", {})
     memory_dict = config_dict.pop("memory", {})
     compressor_dict = config_dict.pop("compressor", {})
-    approval_dict = config_dict.pop("approvals", {})
+    approval_dict = config_dict.pop("approval", {})
     mysql_dict = config_dict.pop("mysql", None)
 
     return AppConfig(
