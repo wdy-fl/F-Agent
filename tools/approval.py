@@ -7,66 +7,59 @@ from typing import Callable
 ApprovalCallback = Callable[[str, str, str], str]
 
 # ============================================================
-# Pattern definitions
+# Pattern definitions  (regex, key, description)
 # ============================================================
 
-HARDLINE_PATTERNS: list[tuple[str, str]] = [
-    (r"rm\s+-rf\s+(/|/home|/etc|/root|/boot|/var|/usr|/opt|/sys|/proc|/dev)", "删除系统关键目录"),
-    (r"sudo\s+rm\s+-rf\s+(/|/home|/etc|/root)", "sudo 删除系统关键目录"),
-    (r"mkfs\.?\w*\s+/dev/", "格式化磁盘设备"),
-    (r"mkfs(/[\w.]+)?\s+/dev/", "格式化磁盘设备"),
-    (r"dd\s+.*of=/dev/sd", "直接写入块设备"),
-    (r":\(\)\{\s*:\s*\|:\s*&\s*\};:", "Fork 炸弹"),
-    (r"kill\s+-9\s+-1\b", "终止所有进程"),
-    (r"killall\s+-9\b", "强制终止所有进程"),
-    (r"\b(shutdown|reboot|halt|poweroff)\b", "系统关机/重启"),
-    (r">\s*/etc/(passwd|shadow|sudoers|fstab)", "覆盖系统关键文件"),
-    (r"chmod\s+-R\s+777\s+(/|/etc|/home|/var|/usr)", "批量放开系统权限"),
-    (r"dd\s+if=/dev/zero\s+of=/dev/", "磁盘清零"),
-    (r"chown\s+-R\s+\S+\s+(/|/etc|/var|/usr|/home)", "批量更改系统文件属主"),
-    (r"format\s+[cC]:", "格式化 Windows 系统盘"),
+HARDLINE_PATTERNS: list[tuple[str, str, str]] = [
+    (r"rm\s+-rf\s+(/|/home|/etc|/root|/boot|/var|/usr|/opt|/sys|/proc|/dev)", "rm_system", "删除系统关键目录"),
+    (r"sudo\s+rm\s+-rf\s+(/|/home|/etc|/root)", "sudo_rm_system", "sudo 删除系统关键目录"),
+    (r"mkfs\.?\w*\s+/dev/", "mkfs", "格式化磁盘设备"),
+    (r"mkfs(/[\w.]+)?\s+/dev/", "mkfs", "格式化磁盘设备"),
+    (r"dd\s+.*of=/dev/sd", "dd_raw", "直接写入块设备"),
+    (r":\(\)\{\s*:\s*\|:\s*&\s*\};:", "fork_bomb", "Fork 炸弹"),
+    (r"kill\s+-9\s+-1\b", "kill_all", "终止所有进程"),
+    (r"killall\s+-9\b", "killall", "强制终止所有进程"),
+    (r"\b(shutdown|reboot|halt|poweroff)\b", "shutdown", "系统关机/重启"),
+    (r">\s*/etc/(passwd|shadow|sudoers|fstab)", "overwrite_system", "覆盖系统关键文件"),
+    (r"chmod\s+-R\s+777\s+(/|/etc|/home|/var|/usr)", "chmod777_system", "批量放开系统权限"),
+    (r"dd\s+if=/dev/zero\s+of=/dev/", "dd_zero", "磁盘清零"),
+    (r"chown\s+-R\s+\S+\s+(/|/etc|/var|/usr|/home)", "chown_system", "批量更改系统文件属主"),
+    (r"format\s+[cC]:", "format_c", "格式化 Windows 系统盘"),
 ]
 
-DANGEROUS_PATTERNS: list[tuple[str, str]] = [
-    (r"rm\s+-rf\s", "递归强制删除"),
-    (r"rm\s+-r\s", "递归删除"),
-    (r"chmod\s+777\s", "设置 777 权限"),
-    (r"chmod\s+-R\s", "递归修改权限"),
-    (r"chown\s+-R\s", "递归修改文件属主"),
-    (r"git\s+push\s+--force", "强制推送"),
-    (r"git\s+push\s+-f\b", "强制推送"),
-    (r"git\s+reset\s+--hard", "硬重置 Git"),
-    (r"curl\s+\S+\s*\|\s*(ba)?sh", "curl 管道执行脚本"),
-    (r"wget\s+\S+\s+-O\s+-\s*\|\s*(ba)?sh", "wget 管道执行脚本"),
-    (r"pip\s+uninstall\s", "卸载 Python 包"),
-    (r"npm\s+uninstall\s", "卸载 npm 包"),
-    (r"DROP\s+(TABLE|DATABASE)", "删除数据库表/库"),
-    (r"TRUNCATE\s+(TABLE\s+)?\w", "清空数据库表"),
-    (r"docker\s+rm\s", "删除 Docker 容器"),
-    (r"docker\s+rmi\s", "删除 Docker 镜像"),
-    (r"docker\s+system\s+prune", "清理 Docker 系统"),
-    (r"docker\s+volume\s+rm", "删除 Docker 卷"),
-    (r">\s*/etc/", "重定向覆盖系统文件"),
-    (r"del\s+/[fq]\s+/s", "Windows 强制递归删除"),
+DANGEROUS_PATTERNS: list[tuple[str, str, str]] = [
+    (r"rm\s+-rf\s", "rm_rf", "递归强制删除"),
+    (r"rm\s+-r\s", "rm_r", "递归删除"),
+    (r"chmod\s+777\s", "chmod777", "设置 777 权限"),
+    (r"chmod\s+-R\s", "chmod_r", "递归修改权限"),
+    (r"chown\s+-R\s", "chown_r", "递归修改文件属主"),
+    (r"git\s+push\s+--force", "git_push_force", "强制推送"),
+    (r"git\s+push\s+-f\b", "git_push_force", "强制推送"),
+    (r"git\s+reset\s+--hard", "git_reset_hard", "硬重置 Git"),
+    (r"curl\s+\S+\s*\|\s*(ba)?sh", "curl_pipe_sh", "curl 管道执行脚本"),
+    (r"wget\s+\S+\s+-O\s+-\s*\|\s*(ba)?sh", "wget_pipe_sh", "wget 管道执行脚本"),
+    (r"pip\s+uninstall\s", "pip_uninstall", "卸载 Python 包"),
+    (r"npm\s+uninstall\s", "npm_uninstall", "卸载 npm 包"),
+    (r"DROP\s+(TABLE|DATABASE)", "drop_table", "删除数据库表/库"),
+    (r"TRUNCATE\s+(TABLE\s+)?\w", "truncate", "清空数据库表"),
+    (r"docker\s+rm\s", "docker_rm", "删除 Docker 容器"),
+    (r"docker\s+rmi\s", "docker_rmi", "删除 Docker 镜像"),
+    (r"docker\s+system\s+prune", "docker_prune", "清理 Docker 系统"),
+    (r"docker\s+volume\s+rm", "docker_volume_rm", "删除 Docker 卷"),
+    (r">\s*/etc/", "redirect_etc", "重定向覆盖系统文件"),
+    (r"del\s+/[fq]\s+/s", "del_force", "Windows 强制递归删除"),
 ]
 
 # ============================================================
-# Lazy-compiled patterns
+# Eager-compiled patterns
 # ============================================================
 
-_hardline_compiled: list[tuple[re.Pattern, str]] = []
-_dangerous_compiled: list[tuple[re.Pattern, str]] = []
-_patterns_compiled: bool = False
-
-
-def _compile_patterns() -> None:
-    global _hardline_compiled, _dangerous_compiled, _patterns_compiled
-    if _patterns_compiled:
-        return
-    _hardline_compiled = [(re.compile(p, re.IGNORECASE), d) for p, d in HARDLINE_PATTERNS]
-    _dangerous_compiled = [(re.compile(p, re.IGNORECASE), d) for p, d in DANGEROUS_PATTERNS]
-    _patterns_compiled = True
-
+_hardline_compiled: list[tuple[re.Pattern, str, str]] = [
+    (re.compile(p, re.IGNORECASE), k, d) for p, k, d in HARDLINE_PATTERNS
+]
+_dangerous_compiled: list[tuple[re.Pattern, str, str]] = [
+    (re.compile(p, re.IGNORECASE), k, d) for p, k, d in DANGEROUS_PATTERNS
+]
 
 # ============================================================
 # Global state (thread-safe)
@@ -116,16 +109,15 @@ def detect_dangerous_command(command: str) -> tuple[str | None, str | None, str 
     Returns:
         (level, key, description) — level 为 "hardline"、"dangerous" 或 None
     """
-    _compile_patterns()
     cmd = _normalize_command(command)
 
-    for pattern, description in _hardline_compiled:
+    for pattern, key, description in _hardline_compiled:
         if pattern.search(cmd):
-            return ("hardline", description, description)
+            return ("hardline", key, description)
 
-    for pattern, description in _dangerous_compiled:
+    for pattern, key, description in _dangerous_compiled:
         if pattern.search(cmd):
-            return ("dangerous", description, description)
+            return ("dangerous", key, description)
 
     return (None, None, None)
 
