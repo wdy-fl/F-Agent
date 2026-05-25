@@ -47,15 +47,25 @@ Body.
         meta, body = parse_frontmatter(content)
         assert meta["tags"] == ["python", "testing"]
 
-    def test_parse_malformed_yaml(self):
+    def test_parse_non_dict_yaml(self):
         content = """---
-name: [unclosed
+hello
 ---
 Body.
 """
         meta, body = parse_frontmatter(content)
         assert meta == {}
-        assert body == content
+        assert body == "Body.\n"
+
+        content_list = """---
+- a
+- b
+---
+Body.
+"""
+        meta, body = parse_frontmatter(content_list)
+        assert meta == {}
+        assert body == "Body.\n"
 
 
 class TestValidateSkillName:
@@ -108,3 +118,25 @@ class TestResolveSkillDir:
 
             result = resolve_skill_dir(str(root), "dup-name")
             assert result is not None
+            assert "cat-a" in result  # sorted order: first match wins
+
+    def test_directory_exists_but_skill_md_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "dev" / "no-skill-md").mkdir(parents=True)
+
+            result = resolve_skill_dir(str(root), "no-skill-md")
+            assert result is None
+
+    def test_name_with_glob_special_chars(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            # name "test-skill" is safe, but validate that glob chars in other
+            # subdirectories don't interfere (glob.escape handles this)
+            (root / "dev" / "test-skill").mkdir(parents=True)
+            (root / "dev" / "test-skill" / "SKILL.md").touch()
+            # Add a directory that would match unescaped glob "t*" pattern
+            (root / "dev" / "trap-dir").mkdir(parents=True)
+
+            result = resolve_skill_dir(str(root), "test-skill")
+            assert result == str(root / "dev" / "test-skill")

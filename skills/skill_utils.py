@@ -6,6 +6,7 @@ Provides shared utilities used by the skills loader and skill tools:
 - resolve_skill_dir: Locate a skill directory by name under a root path
 """
 
+import glob as glob_module
 import re
 from pathlib import Path
 
@@ -16,15 +17,6 @@ import yaml
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 # Also handle empty frontmatter blocks: "---\n---"
 _EMPTY_FRONTMATTER_RE = re.compile(r"^---\s*\n---\s*\n")
-
-# Module-level template constant for creating new SKILL.md files
-_SKILL_MD_FRONTMATTER_TEMPLATE = """\
----
-name: {name}
-description: "{description}"
-category: {category}
----
-"""
 
 
 def parse_frontmatter(content: str) -> tuple[dict, str]:
@@ -55,7 +47,7 @@ def parse_frontmatter(content: str) -> tuple[dict, str]:
 
     # safe_load may return None for empty YAML, or non-dict for scalar/list
     if not isinstance(meta, dict):
-        return {}, content
+        return {}, content[match.end():]
 
     body = content[match.end():]
     return meta, body
@@ -85,7 +77,7 @@ def validate_skill_name(name: str) -> str | None:
 
 def resolve_skill_dir(root: str, name: str) -> str | None:
     """Walk root/{category}/{name}/ directories and return the path to the
-    first directory containing a SKILL.md file whose frontmatter name matches.
+    first directory by name containing a SKILL.md file.
 
     Returns the directory path as a string, or None if not found.
     """
@@ -93,7 +85,8 @@ def resolve_skill_dir(root: str, name: str) -> str | None:
     if not root_path.is_dir():
         return None
 
-    for skill_dir in sorted(root_path.glob("*/" + name)):
+    escaped_name = glob_module.escape(name)
+    for skill_dir in sorted(root_path.glob("*/" + escaped_name)):
         if not skill_dir.is_dir():
             continue
         skill_md = skill_dir / "SKILL.md"
