@@ -6,3 +6,4 @@ import tools.web_search
 import tools.memory
 import tools.think
 import tools.mysql
+import tools.skill
