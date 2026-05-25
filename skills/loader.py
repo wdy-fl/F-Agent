@@ -9,6 +9,10 @@ from pathlib import Path
 
 from skills.skill_utils import parse_frontmatter
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class SkillIndex:
@@ -68,11 +72,15 @@ def build_index(root: str) -> list[SkillIndex]:
         meta, _body = parse_frontmatter(content)
         name = meta.get("name")
         if not name:
+            logger.warning("技能文件缺少 name 字段，已跳过: %s", path)
             continue
+        category = str(meta.get("category", ""))
+        if not category:
+            logger.warning("技能文件缺少 category 字段: %s", path)
         index.append(SkillIndex(
             name=str(name),
             description=str(meta.get("description", "")),
-            category=str(meta.get("category", "")),
+            category=category,
             path=path,
         ))
     return index
@@ -122,7 +130,8 @@ def get_skills_prompt(index: list[SkillIndex]) -> str:
 
     by_category: dict[str, list[SkillIndex]] = defaultdict(list)
     for entry in index:
-        by_category[entry.category].append(entry)
+        if entry.category:
+            by_category[entry.category].append(entry)
 
     lines = ["<available_skills>"]
     for category, entries in sorted(by_category.items()):
