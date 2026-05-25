@@ -3,6 +3,7 @@
 import json
 import logging
 import uuid
+from pathlib import Path
 from typing import Any, Callable
 
 from agent.budget import IterationBudget
@@ -16,6 +17,7 @@ from memory.manager import MemoryManager
 from memory.user_profile import UserProfileManager
 from tools.memory import set_managers
 from tools.registry import registry
+from tools.skill import set_skills_dir
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +56,14 @@ class AgentLoop:
             profile_manager=self.profile_manager,
         )
 
+        set_skills_dir(Path(config.skills_dir))
+
         self.output_callback = output_callback or (lambda t: print(t, end="", flush=True))
-        self.system_prompt = build_system_prompt(include_tools=True)
+        self.system_prompt = build_system_prompt(
+            include_tools=True,
+            include_skills=True,
+            skills_dir=config.skills_dir,
+        )
         self.messages: list[dict[str, Any]] = []
         self.session_id: str | None = None
         self.budget = IterationBudget(self.max_iterations)
