@@ -11,8 +11,8 @@ ApprovalCallback = Callable[[str, str, str], str]
 # ============================================================
 
 HARDLINE_PATTERNS: list[tuple[str, str, str]] = [
-    (r"rm\s+-rf\s+(/|/home|/etc|/root|/boot|/var|/usr|/opt|/sys|/proc|/dev)", "rm_system", "删除系统关键目录"),
-    (r"sudo\s+rm\s+-rf\s+(/|/home|/etc|/root)", "sudo_rm_system", "sudo 删除系统关键目录"),
+    (r"rm\s+-rf\s+(/(?:\s|$|--)|/home|/etc|/root|/boot|/var|/usr|/opt|/sys|/proc|/dev)", "rm_system", "删除系统关键目录"),
+    (r"sudo\s+rm\s+-rf\s+(/(?:\s|$|--)|/home|/etc|/root)", "sudo_rm_system", "sudo 删除系统关键目录"),
     (r"mkfs\.?\w*\s+/dev/", "mkfs", "格式化磁盘设备"),
     (r"mkfs(/[\w.]+)?\s+/dev/", "mkfs", "格式化磁盘设备"),
     (r"dd\s+.*of=/dev/sd", "dd_raw", "直接写入块设备"),
