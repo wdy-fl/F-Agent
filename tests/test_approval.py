@@ -62,6 +62,7 @@ class TestCheckAllGuards:
 
     def setup_method(self):
         set_approval_callback(None)
+        set_approval_context(mode="manual", session_id=None)
 
     def test_hardline_blocked(self):
         result = check_all_guards("rm -rf /")
