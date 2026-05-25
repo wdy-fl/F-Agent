@@ -4,7 +4,7 @@
 """
 
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from skills.skill_utils import parse_frontmatter
@@ -118,7 +118,7 @@ def get_skills_prompt(index: list[SkillIndex]) -> str:
         格式化的可用技能提示词文本。空索引时返回 "(暂无可用技能)"。
     """
     if not index:
-        return "(暂无可用技能)"
+        return "<available_skills>\n(暂无可用技能)\n</available_skills>"
 
     by_category: dict[str, list[SkillIndex]] = defaultdict(list)
     for entry in index:

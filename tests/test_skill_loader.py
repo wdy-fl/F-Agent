@@ -88,7 +88,7 @@ class TestLoadSkill:
 class TestGetSkillsPrompt:
     def test_format_empty_index(self):
         result = get_skills_prompt([])
-        assert "暂无可用技能" in result
+        assert result == "<available_skills>\n(暂无可用技能)\n</available_skills>"
 
     def test_format_grouped_by_category(self):
         entries = [
@@ -97,6 +97,8 @@ class TestGetSkillsPrompt:
             SkillIndex(name="git-flow", description="Git workflow", category="dev", path="/tmp/git-flow"),
         ]
         result = get_skills_prompt(entries)
+        assert result.startswith("<available_skills>")
+        assert result.endswith("</available_skills>")
         assert "## dev" in result
         assert "## data" in result
         assert "py-test" in result
