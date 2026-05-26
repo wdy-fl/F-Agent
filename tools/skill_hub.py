@@ -3,7 +3,6 @@
 import hashlib
 import json
 import logging
-import os
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -179,7 +178,7 @@ def handle_skill_hub_install(args: dict[str, Any]) -> str:
     if skill_md_content is None:
         return json.dumps({"error": "未找到 SKILL.md 文件"}, ensure_ascii=False)
 
-    meta, _body = parse_frontmatter(skill_md_content)
+    meta, _ = parse_frontmatter(skill_md_content)
     skill_name = override_name or meta.get("name")
     if not skill_name:
         return json.dumps({"error": "SKILL.md 缺少 name 字段"}, ensure_ascii=False)
