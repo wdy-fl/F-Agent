@@ -59,6 +59,12 @@ SKILLS_GUIDANCE = """\
 - 用户明确要求"记住这个做法/步骤"时
 
 创建技能时使用清晰的名称和描述，内容应具体、可执行。创建/删除前必须征求用户确认。技能变更后需重启会话才能生效。
+
+### 安装外部技能
+用户要求安装外部技能时，使用 skill_hub_install 工具：
+- GitHub 源：skill_hub_install(source="github", identifier="owner/repo/path/to/skill")
+- URL 源：skill_hub_install(source="url", identifier="https://.../SKILL.md")
+安装前告知用户技能名称和来源，安装后提示重启会话生效。
 """
 
 
