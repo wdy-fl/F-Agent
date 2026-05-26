@@ -18,6 +18,7 @@ from memory.user_profile import UserProfileManager
 from tools.memory import set_managers
 from tools.registry import registry
 from tools.skill import set_skills_dir
+from tools.skill_hub import set_skills_dir as set_skill_hub_dir, set_github_token
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,8 @@ class AgentLoop:
         )
 
         set_skills_dir(Path(config.skills_dir))
+        set_skill_hub_dir(Path(config.skills_dir))
+        set_github_token(config.skills_hub.github_token)
 
         self.output_callback = output_callback or (lambda t: print(t, end="", flush=True))
         self.system_prompt = build_system_prompt(

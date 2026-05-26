@@ -7,6 +7,7 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from skills.skill_utils import parse_frontmatter, resolve_skill_dir
 from tools.registry import registry
@@ -19,6 +20,14 @@ _skills_dir: Path | None = None
 def set_skills_dir(path: Path | None) -> None:
     global _skills_dir
     _skills_dir = path
+
+
+_github_token: str = ""
+
+
+def set_github_token(token: str) -> None:
+    global _github_token
+    _github_token = token
 
 
 def _check_dir() -> str | None:
@@ -77,6 +86,9 @@ def _github_download(url: str, token: str = "") -> str:
 
 def _url_fetch(url: str) -> str:
     """通过 HTTP GET 获取 URL 内容"""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Unsupported URL scheme: {parsed.scheme}")
     req = urllib.request.Request(url)
     req.add_header("User-Agent", "F-Agent")
     resp = urllib.request.urlopen(req, timeout=30)
@@ -135,9 +147,7 @@ def handle_skill_hub_install(args: dict[str, Any]) -> str:
 
     try:
         if source == "github":
-            from config.settings import load_config
-            config = load_config()
-            token = config.skills_hub.github_token
+            token = _github_token
 
             parts = identifier.split("/", 2)
             if len(parts) < 3:
@@ -185,6 +195,10 @@ def handle_skill_hub_install(args: dict[str, Any]) -> str:
     skill_name = str(skill_name)
 
     category = override_category or str(meta.get("category", "uncategorized"))
+
+    # --- Path traversal protection ---
+    if ".." in str(category) or "/" in str(category) or "\\" in str(category):
+        return json.dumps({"error": f"Invalid category: {category}"}, ensure_ascii=False)
 
     # --- Check conflicts ---
     # 1. Check workspace/skills/ directory
