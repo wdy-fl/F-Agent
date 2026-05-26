@@ -3,7 +3,7 @@
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from tools.registry import registry
 from tools.skill_hub import handle_skill_hub_install, set_skills_dir
@@ -150,13 +150,15 @@ class TestSkillHubInstallGitHub:
                         "identifier": "owner/repo/skill",
                     }))
 
+            mock_api.assert_not_called()
+
             assert "error" in result
             assert "my-skill" in result["error"]
         finally:
             tmp.cleanup()
 
     def test_github_api_error(self):
-        tmp, root = _setup_skills_dir()
+        tmp, _ = _setup_skills_dir()
         try:
             with patch("tools.skill_hub._github_api") as mock_api:
                 mock_api.side_effect = Exception("403 Forbidden")
@@ -172,7 +174,7 @@ class TestSkillHubInstallGitHub:
             tmp.cleanup()
 
     def test_invalid_identifier_format(self):
-        tmp, root = _setup_skills_dir()
+        tmp, _ = _setup_skills_dir()
         try:
             result = json.loads(handle_skill_hub_install({
                 "source": "github",
@@ -184,7 +186,7 @@ class TestSkillHubInstallGitHub:
             tmp.cleanup()
 
     def test_missing_name_in_frontmatter(self):
-        tmp, root = _setup_skills_dir()
+        tmp, _ = _setup_skills_dir()
         try:
             with patch("tools.skill_hub._github_api") as mock_api:
                 mock_api.return_value = [
@@ -236,7 +238,7 @@ class TestSkillHubInstallURL:
             tmp.cleanup()
 
     def test_url_request_error(self):
-        tmp, root = _setup_skills_dir()
+        tmp, _ = _setup_skills_dir()
         try:
             with patch("tools.skill_hub._url_fetch") as mock_fetch:
                 mock_fetch.side_effect = Exception("404 Not Found")
@@ -272,7 +274,7 @@ class TestSkillHubInstallURL:
             tmp.cleanup()
 
     def test_url_missing_name(self):
-        tmp, root = _setup_skills_dir()
+        tmp, _ = _setup_skills_dir()
         try:
             with patch("tools.skill_hub._url_fetch") as mock_fetch:
                 mock_fetch.return_value = "---\ndescription: \"No name\"\n---\nBody."
