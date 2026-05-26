@@ -64,6 +64,12 @@ class ApprovalConfig:
 
 
 @dataclass
+class SkillsHubConfig:
+    """Skills Hub 配置"""
+    github_token: str = ""
+
+
+@dataclass
 class AppConfig:
     """应用全局配置"""
     llm: LLMConfig = field(default_factory=LLMConfig)
@@ -71,6 +77,7 @@ class AppConfig:
     memory: MemoryConfig = field(default_factory=MemoryConfig)
     compressor: CompressorConfig = field(default_factory=CompressorConfig)
     approval: ApprovalConfig = field(default_factory=ApprovalConfig)
+    skills_hub: SkillsHubConfig = field(default_factory=SkillsHubConfig)
     mysql: MySQLConfig | None = None
     db_path: str = str(DEFAULT_DB_PATH)
     user_profile_path: str = str(DEFAULT_USER_PROFILE_PATH)
@@ -106,6 +113,7 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
     memory_dict = config_dict.pop("memory", {})
     compressor_dict = config_dict.pop("compressor", {})
     approval_dict = config_dict.pop("approval", {})
+    skills_hub_dict = config_dict.pop("skills_hub", {})
     mysql_dict = config_dict.pop("mysql", None)
 
     return AppConfig(
@@ -115,6 +123,7 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
         compressor=CompressorConfig(**compressor_dict),
         mysql=MySQLConfig(**mysql_dict) if mysql_dict else None,
         approval=ApprovalConfig(**approval_dict) if approval_dict else ApprovalConfig(),
+        skills_hub=SkillsHubConfig(**skills_hub_dict) if skills_hub_dict else SkillsHubConfig(),
         **config_dict,
     )
 
