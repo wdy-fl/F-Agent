@@ -4,7 +4,7 @@
 
 **Goal:** 实现 F-Agent 技能系统的最小可用版本——Agent 从经验中创建技能并复用，使用渐进式披露机制注入系统提示词。
 
-**Architecture:** 新增 `skills/skill_utils.py`（frontmatter 解析/名称校验）、`skills/loader.py`（扫描+索引+提示词格式化）、`tools/skill.py`（三个工具：skills_list/skill_view/skill_manage），修改 `agent/prompt.py`（注入 SKILLS_GUIDANCE 和技能索引）和 `tools/__init__.py`（导入新工具模块）。技能存储在 `workspace/skills/`。
+**Architecture:** 新增 `skill/skill_utils.py`（frontmatter 解析/名称校验）、`skill/loader.py`（扫描+索引+提示词格式化）、`tools/skill.py`（三个工具：skills_list/skill_view/skill_manage），修改 `agent/prompt.py`（注入 SKILLS_GUIDANCE 和技能索引）和 `tools/__init__.py`（导入新工具模块）。技能存储在 `workspace/skills/`。
 
 **Tech Stack:** Python 3.11+, PyYAML (已有依赖), pytest
 
@@ -14,12 +14,12 @@
 
 | 文件 | 操作 | 职责 |
 |------|------|------|
-| `skills/skill_utils.py` | 新增 | frontmatter 解析（YAML→dict+body）、名称校验、路径解析 |
-| `skills/loader.py` | 新增 | 扫描 workspace/skills/、构建索引、格式化 `<available_skills>` 文本 |
+| `skill/skill_utils.py` | 新增 | frontmatter 解析（YAML→dict+body）、名称校验、路径解析 |
+| `skill/loader.py` | 新增 | 扫描 workspace/skills/、构建索引、格式化 `<available_skills>` 文本 |
 | `tools/skill.py` | 新增 | skills_list/skill_view/skill_manage 三个工具注册+handler |
 | `agent/prompt.py` | 修改 | 注入 SKILLS_GUIDANCE + skills 索引到系统提示词 |
 | `tools/__init__.py` | 修改 | 添加 `import tools.skill` |
-| `skills/__init__.py` | 修改 | 保持空文件（模块标记） |
+| `skill/__init__.py` | 修改 | 保持空文件（模块标记） |
 | `tests/test_skill_utils.py` | 新增 | skill_utils 单元测试 |
 | `tests/test_skill_loader.py` | 新增 | loader 扫描+索引测试 |
 | `tests/test_skill_tools.py` | 新增 | 工具注册+handler 各 action 测试 |
@@ -31,7 +31,7 @@
 ### Task 1: skill_utils.py — frontmatter 解析与名称校验
 
 **Files:**
-- Create: `skills/skill_utils.py`
+- Create: `skill/skill_utils.py`
 - Create: `tests/test_skill_utils.py`
 
 - [ ] **Step 1: 编写测试**
@@ -241,7 +241,7 @@ Expected: 全部 PASS
 - [ ] **Step 5: 提交**
 
 ```bash
-cd /Users/wangdeyu/Desktop/agent/F-Agent && git add skills/skill_utils.py tests/test_skill_utils.py && git commit -m "feat: add skill_utils.py — frontmatter 解析、名称校验、路径解析"
+cd /Users/wangdeyu/Desktop/agent/F-Agent && git add skill/skill_utils.py tests/test_skill_utils.py && git commit -m "feat: add skill_utils.py — frontmatter 解析、名称校验、路径解析"
 ```
 
 ---
@@ -249,7 +249,7 @@ cd /Users/wangdeyu/Desktop/agent/F-Agent && git add skills/skill_utils.py tests/
 ### Task 2: loader.py — 技能扫描与索引构建
 
 **Files:**
-- Create: `skills/loader.py`
+- Create: `skill/loader.py`
 - Create: `tests/test_skill_loader.py`
 
 - [ ] **Step 1: 编写测试**
@@ -500,7 +500,7 @@ Expected: 全部 PASS
 - [ ] **Step 5: 提交**
 
 ```bash
-cd /Users/wangdeyu/Desktop/agent/F-Agent && git add skills/loader.py tests/test_skill_loader.py && git commit -m "feat: add loader.py — 技能扫描、索引构建、提示词格式化"
+cd /Users/wangdeyu/Desktop/agent/F-Agent && git add skill/loader.py tests/test_skill_loader.py && git commit -m "feat: add loader.py — 技能扫描、索引构建、提示词格式化"
 ```
 
 ---

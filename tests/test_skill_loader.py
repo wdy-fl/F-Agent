@@ -3,7 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from skills.loader import scan_skills, build_index, load_skill, get_skills_prompt, SkillIndex
+from skill.loader import scan_skills, build_index, load_skill, get_skills_prompt, SkillIndex
 
 
 def _make_skill(root: Path, category: str, name: str, description="A test skill"):

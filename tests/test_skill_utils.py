@@ -3,7 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from skills.skill_utils import parse_frontmatter, validate_skill_name, resolve_skill_dir
+from skill.skill_utils import parse_frontmatter, validate_skill_name, resolve_skill_dir
 
 
 class TestParseFrontmatter:

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from skills.skill_utils import parse_frontmatter, resolve_skill_dir
+from skill.skill_utils import parse_frontmatter, resolve_skill_dir
 from tools.registry import registry
 
 logger = logging.getLogger(__name__)

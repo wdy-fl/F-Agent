@@ -66,7 +66,7 @@ F-Agent/
 │   ├── manager.py             # 记忆管理器：prefetch + sync + 上下文注入
 │   ├── user_profile.py        # 用户建模：USER.md 读写 + LLM 驱动更新
 │   └── context_fence.py       # 上下文围栏：<memory-context> 标签注入/剥离
-├── skills/
+├── skill/
 │   ├── loader.py              # 技能加载：扫描 SKILL.md → 解析 frontmatter → 构建索引
 │   └── skill_utils.py         # 技能工具：frontmatter 解析、名称校验、路径解析
 ├── context/
@@ -87,7 +87,7 @@ F-Agent/
 
 - **AIAgent 不做上帝类** — 拆成 loop.py（流程控制）、prompt.py（提示词构建）、budget.py（预算控制），各自 < 300 行
 - **记忆与工具解耦** — 记忆是独立子系统，tools/memory.py 只是对 LLM 暴露的调用入口
-- **技能与 Agent 解耦** — skills/ 是独立的加载和工具模块，通过 tools/skill.py 供 Agent 调用
+- **技能与 Agent 解耦** — skill/ 是独立的加载和工具模块，通过 tools/skill.py 供 Agent 调用
 
 ## 3. Agent 主循环
 
@@ -387,7 +387,7 @@ workspace/
 ├── config.yaml           # 配置文件
 ├── state.db              # SQLite 数据库
 ├── USER.md               # 用户画像
-├── skills/               # 技能库
+├── skill/               # 技能库
 │   └── <category>/
 │       └── <skill>/
 │           └── SKILL.md

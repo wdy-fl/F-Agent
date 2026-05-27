@@ -7,7 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
-from skills.skill_utils import parse_frontmatter
+from skill.skill_utils import parse_frontmatter
 
 import logging
 

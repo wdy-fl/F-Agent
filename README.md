@@ -68,7 +68,7 @@ F-Agent/
 │   ├── manager.py       # 记忆管理器
 │   ├── user_profile.py  # 用户画像
 │   └── context_fence.py # 上下文围栏
-├── skills/              # 技能系统
+├── skill/               # 技能系统
 │   ├── loader.py        # 技能扫描与索引
 │   └── skill_utils.py   # 共享工具
 ├── context/             # 上下文压缩
@@ -80,7 +80,7 @@ F-Agent/
 │   └── settings.py
 ├── workspace/           # 运行时数据
 │   ├── config.yaml
-│   └── skills/          # 技能库
+│   └── skill/           # 技能库
 └── tests/               # 测试
 ```
 

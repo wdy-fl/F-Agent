@@ -27,8 +27,8 @@ Phase 3 实现技能系统的最小可用版本，Agent 从经验中创建技能
 ## 3. 新增/修改文件
 
 ```
-skills/skill_utils.py   # 新增：frontmatter 解析、名称校验、路径解析
-skills/loader.py        # 新增：扫描 workspace/skills/、构建索引、格式化提示词
+skill/skill_utils.py   # 新增：frontmatter 解析、名称校验、路径解析
+skill/loader.py        # 新增：扫描 workspace/skills/、构建索引、格式化提示词
 tools/skill.py          # 新增：skills_list / skill_view / skill_manage 三个工具
 agent/prompt.py         # 修改：注入 SKILLS_GUIDANCE + <available_skills>
 workspace/skills/       # 新增：运行时技能目录（Agent 自创技能存这里）

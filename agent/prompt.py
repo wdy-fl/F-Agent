@@ -70,7 +70,7 @@ SKILLS_GUIDANCE = """\
 
 def build_skills_section(skills_dir: str) -> str:
     """构建技能索引提示词段落"""
-    from skills.loader import build_index, get_skills_prompt
+    from skill.loader import build_index, get_skills_prompt
     index = build_index(skills_dir)
     return get_skills_prompt(index)
 

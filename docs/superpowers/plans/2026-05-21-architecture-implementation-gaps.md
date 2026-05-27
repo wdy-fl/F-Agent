@@ -22,7 +22,7 @@
 - 用户画像：`~/.fagent/USER.md`
 - 配置：`~/.fagent/config.yaml`
 - 数据库：`~/.fagent/state.db`
-- 技能：`~/.fagent/skills/`
+- 技能：`~/.fagent/skill/`
 - 日志：`~/.fagent/logs/agent.log`
 
 ### 代码现状

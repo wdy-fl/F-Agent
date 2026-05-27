@@ -8,8 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from skills.loader import build_index, load_skill
-from skills.skill_utils import parse_frontmatter, resolve_skill_dir, validate_skill_name
+from skill.loader import build_index, load_skill
+from skill.skill_utils import parse_frontmatter, resolve_skill_dir, validate_skill_name
 from tools.registry import registry
 
 logger = logging.getLogger(__name__)

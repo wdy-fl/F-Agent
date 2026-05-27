@@ -54,8 +54,8 @@
 > ✅ 已完成
 
 1. **技能加载**
-   - `skills/loader.py`：SKILL.md 扫描 + 索引构建
-   - `skills/skill_utils.py`：frontmatter 解析、名称校验、路径解析
+   - `skill/loader.py`：SKILL.md 扫描 + 索引构建
+   - `skill/skill_utils.py`：frontmatter 解析、名称校验、路径解析
    - 技能索引注入到系统提示词（渐进式披露）
 
 2. **技能管理工具**
