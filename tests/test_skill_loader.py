@@ -66,6 +66,23 @@ class TestBuildIndex:
             index = build_index(tmp)
             assert index == []
 
+    def test_build_index_defaults_missing_category(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill_dir = root / "uncategorized" / "no-cat"
+            skill_dir.mkdir(parents=True)
+            (skill_dir / "SKILL.md").write_text("""---
+name: no-cat
+description: "Missing category field"
+---
+Body.
+""", encoding="utf-8")
+
+            index = build_index(str(root))
+            assert len(index) == 1
+            assert index[0].name == "no-cat"
+            assert index[0].category == "uncategorized"
+
 
 class TestLoadSkill:
     def test_load_skill_returns_meta_and_body(self):
@@ -104,3 +121,13 @@ class TestGetSkillsPrompt:
         assert "py-test" in result
         assert "data-sql" in result
         assert "git-flow" in result
+
+    def test_format_handles_empty_category(self):
+        entries = [
+            SkillIndex(name="no-cat", description="No category", category="", path="/tmp/no-cat"),
+        ]
+        result = get_skills_prompt(entries)
+        assert result.startswith("<available_skills>")
+        assert result.endswith("</available_skills>")
+        assert "uncategorized" in result
+        assert "no-cat" in result

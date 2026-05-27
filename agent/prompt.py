@@ -58,13 +58,18 @@ SKILLS_GUIDANCE = """\
 - 发现非平凡的工作流程后
 - 用户明确要求"记住这个做法/步骤"时
 
-创建技能时使用清晰的名称和描述，内容应具体、可执行。创建/删除前必须征求用户确认。技能变更后需重启会话才能生效。
+创建技能时使用清晰的名称和描述，内容应具体、可执行。创建/删除前必须征求用户确认。创建前应询问用户希望将技能归入哪个分类（如 dev、tools、testing 等），用户不指定时使用 "uncategorized"，并在 SKILL.md 的 frontmatter 中填写 category 字段。技能变更后需重启会话才能生效。
 
 ### 安装外部技能
-用户要求安装外部技能时，使用 skill_hub_install 工具：
-- GitHub 源：skill_hub_install(source="github", identifier="owner/repo/path/to/skill")
-- URL 源：skill_hub_install(source="url", identifier="https://.../SKILL.md")
-安装前告知用户技能名称和来源，安装后提示重启会话生效。
+用户要求安装外部技能时，先向用户确认以下信息再调用 skill_hub_install：
+1. **技能来源/地址**：GitHub 仓库路径或 URL
+2. **分类（category）**：询问用户想将技能归入哪个分类（如 dev、tools、testing 等），用户不指定时使用技能自带的 category 或默认值 "uncategorized"
+
+安装流程：
+- 先向用户确认技能名称、来源和分类
+- GitHub 源：skill_hub_install(source="github", identifier="owner/repo/path/to/skill", category="用户指定的分类")
+- URL 源：skill_hub_install(source="url", identifier="https://.../SKILL.md", category="用户指定的分类")
+- 安装后提示重启会话生效。
 """
 
 

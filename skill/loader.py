@@ -74,9 +74,7 @@ def build_index(root: str) -> list[SkillIndex]:
         if not name:
             logger.warning("技能文件缺少 name 字段，已跳过: %s", path)
             continue
-        category = str(meta.get("category", ""))
-        if not category:
-            logger.warning("技能文件缺少 category 字段: %s", path)
+        category = str(meta.get("category", "uncategorized"))
         index.append(SkillIndex(
             name=str(name),
             description=str(meta.get("description", "")),
@@ -130,8 +128,8 @@ def get_skills_prompt(index: list[SkillIndex]) -> str:
 
     by_category: dict[str, list[SkillIndex]] = defaultdict(list)
     for entry in index:
-        if entry.category:
-            by_category[entry.category].append(entry)
+        display_category = entry.category or "uncategorized"
+        by_category[display_category].append(entry)
 
     lines = ["<available_skills>"]
     for category, entries in sorted(by_category.items()):
