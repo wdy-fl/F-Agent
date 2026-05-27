@@ -66,7 +66,9 @@ class AgentLoop:
             include_tools=True,
             include_skills=True,
             skills_dir=config.skills_dir,
+            user_profile_path=config.user_profile_path,
         )
+        self._tools_definitions = registry.get_definitions()
         self.messages: list[dict[str, Any]] = []
         self.session_id: str | None = None
         self.budget = IterationBudget(self.max_iterations)
@@ -105,9 +107,7 @@ class AgentLoop:
             self.session_db.update_session_stats(self.session_id, message_count=1)
             logger.debug("用户消息已持久化到 DB")
 
-        # 获取工具定义
-        tools = registry.get_definitions()
-        logger.debug("工具定义已加载: %s", tools)
+        tools = self._tools_definitions
 
         # 初始化预算，进入主循环
         self.budget.reset()

@@ -46,6 +46,7 @@ class CLIInterface:
         self._interrupted = False
 
         set_approval_callback(self._approval_callback)
+        set_approval_context(mode=self.config.approval.mode)
 
     def run(self) -> None:
         """启动 CLI 交互循环"""
@@ -76,10 +77,7 @@ class CLIInterface:
                 with Live(Text(""), console=self.console, transient=False, refresh_per_second=15) as live:
                     self._live = live
                     try:
-                        set_approval_context(
-                            mode=self.config.approval.mode,
-                            session_id=self.agent.session_id,
-                        )
+                        set_approval_context(session_id=self.agent.session_id)
                         result = self.agent.run(user_input)
                     except KeyboardInterrupt:
                         self.agent.budget.interrupt()

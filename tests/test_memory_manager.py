@@ -5,10 +5,9 @@ from unittest.mock import MagicMock
 from memory.manager import MemoryManager
 
 
-def test_prefetch_with_search_results_and_profile(tmp_path):
-    """测试 prefetch：FTS5 搜索结果 + 用户画像拼接"""
+def test_prefetch_with_search_results(tmp_path):
+    """测试 prefetch：FTS5 搜索结果"""
     profile_path = tmp_path / "USER.md"
-    profile_path.write_text("用户是一名 Python 开发者", encoding="utf-8")
 
     mock_db = MagicMock()
     mock_db.search_messages.return_value = [
@@ -22,14 +21,11 @@ def test_prefetch_with_search_results_and_profile(tmp_path):
     assert "[历史相关对话]" in result
     assert "pytest" in result
     assert "MagicMock" in result
-    assert "[用户画像]" in result
-    assert "Python 开发者" in result
 
 
 def test_prefetch_no_search_results(tmp_path):
-    """测试 prefetch：无搜索结果时仅返回用户画像"""
+    """测试 prefetch：无搜索结果时返回空字符串"""
     profile_path = tmp_path / "USER.md"
-    profile_path.write_text("用户画像内容", encoding="utf-8")
 
     mock_db = MagicMock()
     mock_db.search_messages.return_value = []
@@ -37,9 +33,7 @@ def test_prefetch_no_search_results(tmp_path):
     mgr = MemoryManager(mock_db, str(profile_path))
     result = mgr.prefetch("不存在的关键词")
 
-    assert "[历史相关对话]" not in result
-    assert "[用户画像]" in result
-    assert "用户画像内容" in result
+    assert result == ""
 
 
 def test_prefetch_no_profile(tmp_path):

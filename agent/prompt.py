@@ -35,9 +35,7 @@ TOOL_USE_GUIDANCE = """\
 
 MEMORY_GUIDANCE = """\
 ## 记忆系统
-你的用户消息可能包含 `<memory-context>` 标签，其中注入了：
-- 与当前话题相关的历史对话片段
-- 用户的偏好画像
+你的用户消息可能包含 `<memory-context>` 标签，其中注入了与当前话题相关的历史对话片段。
 
 使用这些信息来个性化回复，但不要在回复中引用标签格式本身。
 """
@@ -85,6 +83,7 @@ def build_system_prompt(
     include_memory_guidance: bool = True,
     include_skills: bool = False,
     skills_dir: str = "",
+    user_profile_path: str = "",
 ) -> str:
     """构建系统提示词
 
@@ -93,6 +92,7 @@ def build_system_prompt(
         include_memory_guidance: 是否包含记忆系统指引
         include_skills: 是否包含技能系统指引和索引
         skills_dir: 技能目录路径
+        user_profile_path: 用户画像文件路径（workspace/USER.md）
     """
     parts = [AGENT_IDENTITY]
 
@@ -107,11 +107,28 @@ def build_system_prompt(
     if include_memory_guidance:
         parts.append(MEMORY_GUIDANCE)
 
+    if user_profile_path:
+        profile = _read_user_profile(user_profile_path)
+        if profile:
+            parts.append(f"## 用户画像\n{profile}")
+
     # 时间戳
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     parts.append(f"\n当前时间：{now}")
 
     return "\n".join(parts)
+
+
+def _read_user_profile(path: str) -> str:
+    """读取用户画像文件"""
+    from pathlib import Path
+    p = Path(path)
+    try:
+        if p.exists():
+            return p.read_text(encoding="utf-8").strip()
+    except Exception:
+        pass
+    return ""
 
 
 def _build_tool_index() -> str:

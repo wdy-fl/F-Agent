@@ -26,7 +26,7 @@ class MemoryManager:
         self.llm = llm
 
     def prefetch(self, user_message: str, limit: int = 5) -> str:
-        """预取相关记忆和用户画像，返回拼装好的记忆上下文字符串
+        """预取相关历史记忆，返回拼装好的记忆上下文字符串
 
         Args:
             user_message: 当前用户输入，用作搜索关键词
@@ -36,8 +36,6 @@ class MemoryManager:
             拼装好的记忆上下文，格式为：
             [历史记忆]
             <FTS5 搜索结果>
-            [用户画像]
-            <USER.md 内容>
         """
         parts = []
 
@@ -51,11 +49,6 @@ class MemoryManager:
                 if content:
                     lines.append(f"- [{role}]: {content[:200]}")
             parts.append("\n".join(lines))
-
-        # 用户画像
-        profile = self.get_user_profile()
-        if profile:
-            parts.append(f"[用户画像]\n{profile}")
 
         return "\n\n".join(parts)
 
