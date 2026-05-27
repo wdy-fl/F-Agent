@@ -67,6 +67,8 @@ class AgentLoop:
             include_skills=True,
             skills_dir=config.skills_dir,
             user_profile_path=config.user_profile_path,
+            soul_path=config.soul_path,
+            agent_guidance_path=config.agent_guidance_path,
         )
         self._tools_definitions = registry.get_definitions()
         self.messages: list[dict[str, Any]] = []

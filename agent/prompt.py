@@ -4,72 +4,6 @@ from datetime import datetime
 
 from tools.registry import registry
 
-AGENT_IDENTITY = """\
-你是阿福（F-Agent），一个智能个人助手。
-
-## 核心能力
-- 智能对话：理解用户意图，提供有帮助的回答
-- 工具调用：通过工具与系统交互（终端执行、文件操作、Web 搜索等）
-
-## 行为准则
-- 用中文与用户交流，除非用户明确要求其他语言
-- 回答简洁有用，不啰嗦
-- 需要执行操作时主动使用工具，不要只描述计划
-- 遇到不确定的问题，坦诚说明而不是猜测
-"""
-
-TOOL_USE_GUIDANCE = """\
-## 工具使用
-你有可用的工具来完成任务。当需要执行操作时，直接调用工具，不要只是描述你将要做什么。
-
-### 可用工具
-{tool_index}
-
-### 工具使用规则
-- 需要执行命令时使用 terminal 工具
-- 需要读写文件时使用 read_file / write_file 工具
-- 需要搜索信息时使用 web_search 工具
-- 多个独立的只读操作可以并行执行
-- 有副作用的操作（写入文件、执行命令）会顺序执行
-"""
-
-MEMORY_GUIDANCE = """\
-## 记忆系统
-你的用户消息可能包含 `<memory-context>` 标签，其中注入了与当前话题相关的历史对话片段。
-
-使用这些信息来个性化回复，但不要在回复中引用标签格式本身。
-"""
-
-SKILLS_GUIDANCE = """\
-## 技能系统
-你有可用的技能（Skills）——它们是程序性记忆，存储了经过验证的完成特定任务的方法和流程。
-
-### 使用方式
-- 回复前先检查 <available_skills> 索引，如果有与当前任务相关的技能，调用 skill_view(name) 加载完整指令并遵循
-- 使用技能时发现内容过时、不完整或错误，用 skill_manage(action='edit') 修正
-
-### 创建技能
-在以下情况，用 skill_manage 保存方法供将来复用：
-- 完成复杂任务（5+ 次工具调用）后
-- 克服棘手错误并找到解决方案后
-- 用户纠正过的做法最终生效后
-- 发现非平凡的工作流程后
-- 用户明确要求"记住这个做法/步骤"时
-
-创建技能时使用清晰的名称和描述，内容应具体、可执行。创建/删除前必须征求用户确认。创建前应询问用户希望将技能归入哪个分类（如 dev、tools、testing 等），用户不指定时使用 "uncategorized"，并在 SKILL.md 的 frontmatter 中填写 category 字段。技能变更后需重启会话才能生效。
-
-### 安装外部技能
-用户要求安装外部技能时，先向用户确认以下信息再调用 skill_hub_install：
-1. **技能来源/地址**：GitHub 仓库路径或 URL
-2. **分类（category）**：询问用户想将技能归入哪个分类（如 dev、tools、testing 等），用户不指定时使用技能自带的 category 或默认值 "uncategorized"
-
-安装流程：
-- 先向用户确认技能名称、来源和分类
-- GitHub 源：skill_hub_install(source="github", identifier="owner/repo/path/to/skill", category="用户指定的分类")
-- URL 源：skill_hub_install(source="url", identifier="https://.../SKILL.md", category="用户指定的分类")
-- 安装后提示重启会话生效。
-"""
-
 
 def build_skills_section(skills_dir: str) -> str:
     """构建技能索引提示词段落"""
@@ -84,6 +18,8 @@ def build_system_prompt(
     include_skills: bool = False,
     skills_dir: str = "",
     user_profile_path: str = "",
+    soul_path: str = "",
+    agent_guidance_path: str = "",
 ) -> str:
     """构建系统提示词
 
@@ -93,24 +29,25 @@ def build_system_prompt(
         include_skills: 是否包含技能系统指引和索引
         skills_dir: 技能目录路径
         user_profile_path: 用户画像文件路径（workspace/USER.md）
+        soul_path: Agent 画像文件路径（workspace/SOUL.md）
+        agent_guidance_path: Agent 指引文件路径（workspace/AGENT.md）
     """
-    parts = [AGENT_IDENTITY]
-
-    if include_tools:
-        tool_index = _build_tool_index()
-        parts.append(TOOL_USE_GUIDANCE.format(tool_index=tool_index))
-
-    if include_skills and skills_dir:
-        parts.append(SKILLS_GUIDANCE)
-        parts.append(build_skills_section(skills_dir))
-
-    if include_memory_guidance:
-        parts.append(MEMORY_GUIDANCE)
+    identity = _read_file(soul_path) if soul_path else _default_identity()
+    parts = [identity]
 
     if user_profile_path:
-        profile = _read_user_profile(user_profile_path)
+        profile = _read_file(user_profile_path)
         if profile:
             parts.append(f"## 用户画像\n{profile}")
+
+    if include_tools or include_memory_guidance or include_skills:
+        guidance = _read_file(agent_guidance_path) if agent_guidance_path else ""
+        if guidance:
+            tool_index = _build_tool_index() if include_tools else "（暂无可用工具）"
+            parts.append(guidance.format(tool_index=tool_index))
+
+    if include_skills and skills_dir:
+        parts.append(build_skills_section(skills_dir))
 
     # 时间戳
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -119,8 +56,8 @@ def build_system_prompt(
     return "\n".join(parts)
 
 
-def _read_user_profile(path: str) -> str:
-    """读取用户画像文件"""
+def _read_file(path: str) -> str:
+    """读取文件内容"""
     from pathlib import Path
     p = Path(path)
     try:
@@ -129,6 +66,11 @@ def _read_user_profile(path: str) -> str:
     except Exception:
         pass
     return ""
+
+
+def _default_identity() -> str:
+    """SOUL.md 不存在时的兜底身份描述"""
+    return "你是阿福（F-Agent），一个智能个人助手。"
 
 
 def _build_tool_index() -> str:
