@@ -14,7 +14,6 @@ from db.session import SessionDB
 from llm.client import LLMClient
 from memory.context_fence import inject_context
 from memory.manager import MemoryManager
-from memory.user_profile import UserProfileManager
 from tools.memory import set_managers
 from tools.registry import registry
 from tools.skill import set_skills_dir
@@ -33,6 +32,7 @@ class AgentLoop:
         output_callback: Callable[[str], None] | None = None,
     ):
         self.llm = LLMClient(config.llm)
+        self.config = config
         self.max_iterations = config.llm.max_iterations
         self.session_db = session_db
         self.memory_manager = (
@@ -47,9 +47,6 @@ class AgentLoop:
             if session_db
             else None
         )
-        self.profile_manager = UserProfileManager(
-            config.user_profile_path, llm=self.llm
-        )
         self.compressor = ContextCompressor(
             self.llm,
             context_window=config.llm.context_window,
@@ -59,10 +56,7 @@ class AgentLoop:
             protected_tail_tokens=config.compressor.protected_tail_tokens,
         )
 
-        set_managers(
-            memory_manager=self.memory_manager,
-            profile_manager=self.profile_manager,
-        )
+        set_managers(memory_manager=self.memory_manager)
 
         set_skills_dir(Path(config.skills_dir))
         set_skill_hub_dir(Path(config.skills_dir))
@@ -82,7 +76,7 @@ class AgentLoop:
         self.session_id: str | None = None
         self.budget = IterationBudget(self.max_iterations)
         self.turn_count = 0
-        self._nudge_interval = config.memory.nudge_interval
+        self._pending_nudge: str | None = None
 
     def run(self, user_message: str) -> str:
         """运行一轮对话，返回最终回复文本
@@ -98,16 +92,10 @@ class AgentLoop:
         self.turn_count += 1
         original_message = user_message
 
-        # Nudge 提醒：每 N 轮提示 LLM 使用 memory 工具
-        if self.turn_count > 1 and self.turn_count % self._nudge_interval == 0:
-            nudge = (
-                "\n\n[系统提醒] 当前对话已进行多轮。如果你发现有值得记住的信息"
-                "（用户偏好、项目约定、重要决策等），请使用 memory 工具保存：\n"
-                "- append_memory: 追加到持久化笔记 MEMORY.md\n"
-                "- update_soul: 调整 Agent 身份描述\n"
-                "- update_agent: 调整行为指引\n"
-            )
-            user_message = user_message + nudge
+        if self._pending_nudge:
+            nudge = self._pending_nudge
+            self._pending_nudge = None
+            user_message = user_message + "\n\n[系统提醒] " + nudge
 
         self._ensure_conversation_started(user_message)
         logger.debug("会话已初始化, session_id=%s", self.session_id)
@@ -116,7 +104,7 @@ class AgentLoop:
         enhanced_message = user_message
         if self.memory_manager:
             logger.debug("正在预取记忆上下文")
-            memory_context = self.memory_manager.prefetch(user_message)
+            memory_context = self.memory_manager.prefetch(user_message, limit=self.config.memory.prefetch_limit)
             if memory_context:
                 logger.debug("记忆上下文内容: %s", memory_context)
                 enhanced_message = inject_context(user_message, memory_context)
@@ -242,9 +230,11 @@ class AgentLoop:
 
 
     def _sync_memory(self, user_message: str, assistant_message: str) -> None:
-        """同步记忆（如果配置了记忆管理器）"""
+        """同步记忆：LLM 判断本轮是否有值得记住的信息 → 精准 nudge"""
         if self.memory_manager and self.session_id:
-            self.memory_manager.sync(self.session_id, user_message, assistant_message)
+            nudge = self.memory_manager.sync(self.session_id, user_message, assistant_message)
+            if nudge:
+                self._pending_nudge = nudge
 
     def _estimate_total_tokens(self) -> int:
         """估算当前消息列表的总 token 数"""
