@@ -2,9 +2,13 @@
 
 from unittest.mock import patch
 
+from pathlib import Path
+
 from agent.loop import AgentLoop
 from agent.prompt import build_system_prompt
 from config.settings import AppConfig, LLMConfig
+
+_AGENT_PATH = str(Path(__file__).parent.parent / "workspace" / "AGENT.md")
 
 
 def _make_stream_events(content="你好！我是阿福。", tool_calls=None, finish_reason="stop"):
@@ -222,5 +226,5 @@ def test_build_system_prompt():
     assert "阿福" in prompt
     assert "当前时间" in prompt
 
-    prompt_with_tools = build_system_prompt(include_tools=True)
+    prompt_with_tools = build_system_prompt(include_tools=True, agent_guidance_path=_AGENT_PATH)
     assert "工具使用" in prompt_with_tools

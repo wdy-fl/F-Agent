@@ -64,10 +64,55 @@ def handle_memory(args: dict) -> str:
         new_profile = _profile_manager.update_profile(observations)
         return json.dumps({"status": "updated", "profile_length": len(new_profile)}, ensure_ascii=False)
 
+    elif action == "read_memory":
+        if not _memory_manager:
+            return json.dumps({"error": "Memory manager not available"}, ensure_ascii=False)
+        content = _memory_manager.get_memory()
+        return json.dumps({"content": content}, ensure_ascii=False)
+
+    elif action == "append_memory":
+        content = args.get("content", "")
+        if not content:
+            return json.dumps({"error": "content is required for append_memory action"}, ensure_ascii=False)
+        if not _memory_manager:
+            return json.dumps({"error": "Memory manager not available"}, ensure_ascii=False)
+        _memory_manager.append_to_memory(content)
+        return json.dumps({"status": "appended"}, ensure_ascii=False)
+
+    elif action == "read_soul":
+        if not _memory_manager:
+            return json.dumps({"error": "Memory manager not available"}, ensure_ascii=False)
+        content = _memory_manager.get_soul()
+        return json.dumps({"content": content}, ensure_ascii=False)
+
+    elif action == "update_soul":
+        content = args.get("content", "")
+        if not content:
+            return json.dumps({"error": "content is required for update_soul action"}, ensure_ascii=False)
+        if not _memory_manager:
+            return json.dumps({"error": "Memory manager not available"}, ensure_ascii=False)
+        _memory_manager.update_soul(content)
+        return json.dumps({"status": "updated"}, ensure_ascii=False)
+
+    elif action == "read_agent":
+        if not _memory_manager:
+            return json.dumps({"error": "Memory manager not available"}, ensure_ascii=False)
+        content = _memory_manager.get_agent()
+        return json.dumps({"content": content}, ensure_ascii=False)
+
+    elif action == "update_agent":
+        content = args.get("content", "")
+        if not content:
+            return json.dumps({"error": "content is required for update_agent action"}, ensure_ascii=False)
+        if not _memory_manager:
+            return json.dumps({"error": "Memory manager not available"}, ensure_ascii=False)
+        _memory_manager.update_agent(content)
+        return json.dumps({"status": "updated"}, ensure_ascii=False)
+
     else:
         return json.dumps({
             "error": f"Unknown action: {action}",
-            "available_actions": ["search", "save", "update_profile"],
+            "available_actions": ["search", "save", "update_profile", "read_memory", "append_memory", "read_soul", "update_soul", "read_agent", "update_agent"],
         }, ensure_ascii=False)
 
 
@@ -77,14 +122,14 @@ registry.register(
         "type": "function",
         "function": {
             "name": "memory",
-            "description": "管理记忆和用户画像。action='search' 搜索历史对话，'save' 写入画像，'update_profile' 让 LLM 合并新观察到画像",
+            "description": "管理持久化记忆和工作区文件。search=搜索历史对话，save=覆写用户画像，update_profile=LLM合并画像，read_memory/append_memory=读写Agent笔记，read_soul/update_soul=读写身份描述，read_agent/update_agent=读写行为指引",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "action": {
                         "type": "string",
-                        "description": "操作类型：search（搜索历史）、save（写入画像）、update_profile（LLM 合并画像）",
-                        "enum": ["search", "save", "update_profile"],
+                        "description": "操作类型",
+                        "enum": ["search", "save", "update_profile", "read_memory", "append_memory", "read_soul", "update_soul", "read_agent", "update_agent"],
                     },
                     "query": {
                         "type": "string",
@@ -92,7 +137,7 @@ registry.register(
                     },
                     "content": {
                         "type": "string",
-                        "description": "画像内容（action=save 时必填）",
+                        "description": "内容（action=save/append_memory/update_soul/update_agent 时必填）",
                     },
                     "observations": {
                         "type": "string",

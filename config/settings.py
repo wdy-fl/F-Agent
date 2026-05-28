@@ -10,6 +10,7 @@ DEFAULT_CONFIG_DIR = Path(__file__).parent.parent / "workspace"
 DEFAULT_CONFIG_PATH = DEFAULT_CONFIG_DIR / "config.yaml"
 DEFAULT_DB_PATH = DEFAULT_CONFIG_DIR / "state.db"
 DEFAULT_USER_PROFILE_PATH = DEFAULT_CONFIG_DIR / "USER.md"
+DEFAULT_MEMORY_PATH = DEFAULT_CONFIG_DIR / "MEMORY.md"
 DEFAULT_SOUL_PATH = DEFAULT_CONFIG_DIR / "SOUL.md"
 DEFAULT_AGENT_PATH = DEFAULT_CONFIG_DIR / "AGENT.md"
 DEFAULT_SKILLS_DIR = DEFAULT_CONFIG_DIR / "skills"
@@ -38,6 +39,7 @@ class ToolConfig:
 class MemoryConfig:
     """记忆相关配置"""
     prefetch_limit: int = 5
+    nudge_interval: int = 5
 
 
 @dataclass
@@ -83,6 +85,7 @@ class AppConfig:
     mysql: MySQLConfig | None = None
     db_path: str = str(DEFAULT_DB_PATH)
     user_profile_path: str = str(DEFAULT_USER_PROFILE_PATH)
+    memory_path: str = str(DEFAULT_MEMORY_PATH)
     soul_path: str = str(DEFAULT_SOUL_PATH)
     agent_guidance_path: str = str(DEFAULT_AGENT_PATH)
     skills_dir: str = str(DEFAULT_SKILLS_DIR)

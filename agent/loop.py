@@ -36,7 +36,14 @@ class AgentLoop:
         self.max_iterations = config.llm.max_iterations
         self.session_db = session_db
         self.memory_manager = (
-            MemoryManager(session_db, config.user_profile_path, llm=self.llm)
+            MemoryManager(
+                session_db,
+                config.user_profile_path,
+                memory_path=config.memory_path,
+                soul_path=config.soul_path,
+                agent_path=config.agent_guidance_path,
+                llm=self.llm,
+            )
             if session_db
             else None
         )
@@ -74,6 +81,8 @@ class AgentLoop:
         self.messages: list[dict[str, Any]] = []
         self.session_id: str | None = None
         self.budget = IterationBudget(self.max_iterations)
+        self.turn_count = 0
+        self._nudge_interval = config.memory.nudge_interval
 
     def run(self, user_message: str) -> str:
         """运行一轮对话，返回最终回复文本
@@ -85,6 +94,20 @@ class AgentLoop:
             Agent 的最终文本回复
         """
         logger.info("=== run 开始, user_message=%r", user_message[:80])
+
+        self.turn_count += 1
+        original_message = user_message
+
+        # Nudge 提醒：每 N 轮提示 LLM 使用 memory 工具
+        if self.turn_count > 1 and self.turn_count % self._nudge_interval == 0:
+            nudge = (
+                "\n\n[系统提醒] 当前对话已进行多轮。如果你发现有值得记住的信息"
+                "（用户偏好、项目约定、重要决策等），请使用 memory 工具保存：\n"
+                "- append_memory: 追加到持久化笔记 MEMORY.md\n"
+                "- update_soul: 调整 Agent 身份描述\n"
+                "- update_agent: 调整行为指引\n"
+            )
+            user_message = user_message + nudge
 
         self._ensure_conversation_started(user_message)
         logger.debug("会话已初始化, session_id=%s", self.session_id)
@@ -104,8 +127,8 @@ class AgentLoop:
         logger.debug("用户消息已追加: %s", user_msg)
 
         if self.session_db and self.session_id:
-            # DB 存储原始用户消息，不含记忆上下文，保证搜索干净
-            self.session_db.append_message(self.session_id, "user", content=user_message)
+            # DB 存储原始用户消息，不含 nudge 和记忆上下文，保证搜索干净
+            self.session_db.append_message(self.session_id, "user", content=original_message)
             self.session_db.update_session_stats(self.session_id, message_count=1)
             logger.debug("用户消息已持久化到 DB")
 
