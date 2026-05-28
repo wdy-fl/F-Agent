@@ -68,6 +68,7 @@ class AgentLoop:
             include_skills=True,
             skills_dir=config.skills_dir,
             user_profile_path=config.user_profile_path,
+            memory_path=config.memory_path,
             soul_path=config.soul_path,
             agent_guidance_path=config.agent_guidance_path,
         )
