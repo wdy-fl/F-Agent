@@ -263,3 +263,23 @@ def test_fts5_migration_from_v1(tmp_path):
     cur = db.conn.execute("SELECT version FROM schema_version")
     assert cur.fetchone()[0] == SCHEMA_VERSION
     db.close()
+
+
+def test_end_session_with_tags(tmp_path):
+    db = SessionDB(tmp_path / "test.db")
+    db.create_session("sess-tags", "deepseek-v4-pro", "test", title="原始标题")
+    db.end_session_with_tags("sess-tags", title="新标题", tags="python,debug")
+    session = db.get_session("sess-tags")
+    assert session["title"] == "新标题"
+    assert session["tags"] == "python,debug"
+    assert session["ended_at"] is not None
+    db.close()
+
+
+def test_update_compressed_tokens(tmp_path):
+    db = SessionDB(tmp_path / "test.db")
+    db.create_session("sess-comp", "deepseek-v4-pro", "test")
+    db.update_compressed_tokens("sess-comp", 50000)
+    session = db.get_session("sess-comp")
+    assert session["compressed_tokens"] == 50000
+    db.close()

@@ -415,3 +415,11 @@ def test_summary_prompt_uses_explicit_empty_placeholders():
     prompt = mock_llm.chat.call_args.kwargs["messages"][0]["content"]
     assert "旧摘要：（无旧摘要）" in prompt
     assert "新增对话：（无新增对话）" in prompt
+
+
+def test_get_set_last_compressed_tokens():
+    llm = MagicMock()
+    comp = ContextCompressor(llm)
+    assert comp.get_last_compressed_tokens() is None
+    comp.set_last_compressed_tokens(50000)
+    assert comp.get_last_compressed_tokens() == 50000
