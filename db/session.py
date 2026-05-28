@@ -96,6 +96,42 @@ class SessionDB:
         row = cur.fetchone()
         return dict(row) if row else None
 
+    def end_session_with_tags(
+        self,
+        session_id: str,
+        title: str | None = None,
+        tags: str | None = None,
+    ) -> None:
+        """结束会话并更新标题和标签
+
+        Args:
+            session_id: 会话 ID
+            title: LLM 生成的标题（可选）
+            tags: 逗号分隔的标签字符串（可选）
+        """
+        updates = ["ended_at = CURRENT_TIMESTAMP"]
+        values: list[Any] = []
+        if title is not None:
+            updates.append("title = ?")
+            values.append(title)
+        if tags is not None:
+            updates.append("tags = ?")
+            values.append(tags)
+        values.append(session_id)
+        self.conn.execute(
+            f"UPDATE sessions SET {', '.join(updates)} WHERE id = ?",
+            values,
+        )
+        self.conn.commit()
+
+    def update_compressed_tokens(self, session_id: str, tokens: int) -> None:
+        """更新会话的压缩 token 数"""
+        self.conn.execute(
+            "UPDATE sessions SET compressed_tokens = ? WHERE id = ?",
+            (tokens, session_id),
+        )
+        self.conn.commit()
+
     def list_sessions(self, limit: int = 20) -> list[dict]:
         """列出最近的会话"""
         cur = self.conn.execute(
