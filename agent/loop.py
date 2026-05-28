@@ -213,6 +213,12 @@ class AgentLoop:
         self.session_id = session_id
         self.messages = [{"role": "system", "content": self.system_prompt}]
         self.messages.extend(restored)
+
+        # 恢复压缩状态
+        compressed = session.get("compressed_tokens")
+        if compressed:
+            self.compressor.set_last_compressed_tokens(compressed)
+
         return len(restored)
 
     def _ensure_conversation_started(self, first_user_message: str) -> None:
@@ -255,6 +261,10 @@ class AgentLoop:
         estimated_tokens = self._estimate_total_tokens()
         if self.compressor.should_compress(estimated_tokens):
             self.messages = self.compressor.compress(self.messages, estimated_tokens)
+            if self.session_db and self.session_id:
+                last = self.compressor.get_last_compressed_tokens()
+                if last:
+                    self.session_db.update_compressed_tokens(self.session_id, last)
 
     def _call_llm_stream(self, tools: list[dict] | None = None) -> dict[str, Any]:
         """流式调用 LLM，实时输出内容，返回完整响应"""

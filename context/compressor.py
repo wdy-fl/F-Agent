@@ -277,3 +277,11 @@ class ContextCompressor:
             text = str(message)
         # 中英文混合粗略估算：字符数 / 2.5
         return max(1, int(len(text) / 2.5))
+
+    def get_last_compressed_tokens(self) -> int | None:
+        """获取上次压缩时的 token 数（供外部持久化）"""
+        return self._last_compressed_tokens
+
+    def set_last_compressed_tokens(self, tokens: int | None) -> None:
+        """恢复上次压缩时的 token 数（从 DB 恢复）"""
+        self._last_compressed_tokens = tokens
