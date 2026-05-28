@@ -1,13 +1,14 @@
 """CLI 命令测试"""
 from unittest.mock import patch, MagicMock
 from cli.interface import CLIInterface
-from config.settings import AppConfig, LLMConfig
+from config.settings import AppConfig, LLMConfig, set_config
 
 
 def test_list_sessions_with_indices():
     """验证 /sessions 输出带有序号"""
     config = AppConfig(llm=LLMConfig(api_key="sk-test"))
-    cli = CLIInterface(config)
+    set_config(config)
+    cli = CLIInterface()
 
     mock_sessions = [
         {"id": "aaa-bbb-ccc", "title": "测试会话", "message_count": 5},
@@ -28,7 +29,8 @@ def test_list_sessions_with_indices():
 def test_resume_interactive_valid_choice():
     """验证交互式恢复选择有效序号"""
     config = AppConfig(llm=LLMConfig(api_key="sk-test"))
-    cli = CLIInterface(config)
+    set_config(config)
+    cli = CLIInterface()
 
     mock_sessions = [
         {"id": "sess-001", "title": "测试会话1", "message_count": 3},
@@ -47,7 +49,8 @@ def test_resume_interactive_valid_choice():
 def test_resume_interactive_invalid_choice():
     """验证交互式恢复选择无效序号时提示错误"""
     config = AppConfig(llm=LLMConfig(api_key="sk-test"))
-    cli = CLIInterface(config)
+    set_config(config)
+    cli = CLIInterface()
 
     mock_sessions = [
         {"id": "sess-001", "title": "测试会话", "message_count": 3},
@@ -66,7 +69,8 @@ def test_resume_interactive_invalid_choice():
 def test_resume_interactive_empty_sessions():
     """验证无历史会话时的提示"""
     config = AppConfig(llm=LLMConfig(api_key="sk-test"))
-    cli = CLIInterface(config)
+    set_config(config)
+    cli = CLIInterface()
 
     cli.session_db.list_sessions = MagicMock(return_value=[])
 
@@ -81,7 +85,8 @@ def test_resume_interactive_empty_sessions():
 def test_print_conversation_formats_roles():
     """验证对话历史按角色打印"""
     config = AppConfig(llm=LLMConfig(api_key="sk-test"))
-    cli = CLIInterface(config)
+    set_config(config)
+    cli = CLIInterface()
 
     messages = [
         {"role": "user", "content": "你好"},
@@ -104,7 +109,8 @@ def test_print_conversation_formats_roles():
 def test_print_conversation_truncates_long_tool_output():
     """验证长工具输出被截断"""
     config = AppConfig(llm=LLMConfig(api_key="sk-test"))
-    cli = CLIInterface(config)
+    set_config(config)
+    cli = CLIInterface()
 
     long_content = "x" * 300
     messages = [

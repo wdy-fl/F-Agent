@@ -10,7 +10,7 @@ from rich.markdown import Markdown
 from rich.text import Text
 
 from agent.loop import AgentLoop
-from config.settings import AppConfig, ensure_config_dir
+from config.settings import ensure_config_dir, get_config
 from tools.approval import set_approval_callback, set_approval_context
 from db.session import SessionDB
 
@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 class CLIInterface:
     """F-Agent CLI 界面，使用 prompt_toolkit + rich"""
 
-    def __init__(self, config: AppConfig):
+    def __init__(self):
+        config = get_config()
         self.config = config
         self.console = Console()
 
@@ -29,7 +30,6 @@ class CLIInterface:
 
         # 创建 Agent 循环（AgentLoop 内部自行创建 llm/memory/compressor 等依赖）
         self.agent = AgentLoop(
-            config,
             session_db=self.session_db,
             output_callback=self._on_stream_delta,
         )

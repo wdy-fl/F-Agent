@@ -5,8 +5,7 @@ import sys
 from pathlib import Path
 
 from cli.interface import CLIInterface
-from config.settings import load_config, ensure_config_dir
-from tools.registry import registry
+from config.settings import get_config, ensure_config_dir
 import tools  # noqa: F401 — 触发工具自注册
 
 
@@ -44,8 +43,7 @@ def configure_logging(log_dir):
 def main():
     """启动 F-Agent"""
     # 加载配置
-    config = load_config()
-    registry._app_config = config
+    config = get_config()
 
     # 验证 API Key
     if not config.llm.api_key:
@@ -60,7 +58,7 @@ def main():
     configure_logging(log_dir)
 
     # 启动 CLI
-    cli = CLIInterface(config)
+    cli = CLIInterface()
     cli.run()
 
 

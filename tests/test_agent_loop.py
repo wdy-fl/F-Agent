@@ -6,7 +6,7 @@ from pathlib import Path
 
 from agent.loop import AgentLoop
 from agent.prompt import build_system_prompt
-from config.settings import AppConfig, LLMConfig
+from config.settings import AppConfig, LLMConfig, set_config
 
 _AGENT_PATH = str(Path(__file__).parent.parent / "workspace" / "AGENT.md")
 
@@ -28,7 +28,8 @@ def _make_stream_events(content="你好！我是阿福。", tool_calls=None, fin
 def test_agent_loop_basic():
     """测试基础对话流程"""
     config = AppConfig(llm=LLMConfig(api_key="sk-test"))
-    agent = AgentLoop(config, output_callback=lambda t: None)
+    set_config(config)
+    agent = AgentLoop(output_callback=lambda t: None)
 
     stream_events = _make_stream_events("你好！我是阿福。")
     with patch.object(agent.llm, "chat_stream", return_value=iter(stream_events)):
@@ -41,7 +42,8 @@ def test_agent_loop_basic():
 def test_agent_loop_tool_calls_execute():
     """测试工具调用会被执行，循环继续直到获得最终回复"""
     config = AppConfig(llm=LLMConfig(api_key="sk-test"))
-    agent = AgentLoop(config, output_callback=lambda t: None)
+    set_config(config)
+    agent = AgentLoop(output_callback=lambda t: None)
 
     # 确保终端工具已注册
     import tools.terminal
@@ -72,7 +74,8 @@ def test_agent_loop_tool_calls_execute():
 def test_agent_loop_budget_exhaustion_uses_single_grace_call():
     """预算耗尽后只进行一次 grace call，不额外放行正常调用。"""
     config = AppConfig(llm=LLMConfig(api_key="sk-test", max_iterations=1))
-    agent = AgentLoop(config, output_callback=lambda t: None)
+    set_config(config)
+    agent = AgentLoop(output_callback=lambda t: None)
 
     tool_events = _make_stream_events(
         content="",
@@ -104,7 +107,8 @@ def test_agent_loop_budget_exhaustion_uses_single_grace_call():
 def test_agent_loop_grace_call_does_not_expose_tools():
     """预算耗尽后的最终总结调用不再暴露工具定义。"""
     config = AppConfig(llm=LLMConfig(api_key="sk-test", max_iterations=1))
-    agent = AgentLoop(config, output_callback=lambda t: None)
+    set_config(config)
+    agent = AgentLoop(output_callback=lambda t: None)
 
     tool_events = _make_stream_events(
         content="",
@@ -131,7 +135,8 @@ def test_agent_loop_grace_call_does_not_expose_tools():
 def test_agent_loop_preserves_reasoning_content():
     """测试 reasoning_content 在 assistant 消息中被保留"""
     config = AppConfig(llm=LLMConfig(api_key="sk-test"))
-    agent = AgentLoop(config, output_callback=lambda t: None)
+    set_config(config)
+    agent = AgentLoop(output_callback=lambda t: None)
 
     events = _make_stream_events(content="Hello")
     # 手动注入 reasoning_content 到 done 事件
@@ -155,7 +160,8 @@ def test_agent_loop_restore_session_loads_persisted_messages(tmp_path):
     db.append_message("sess-restore", "assistant", content="之前的回答")
 
     config = AppConfig(llm=LLMConfig(api_key="sk-test"))
-    agent = AgentLoop(config, session_db=db, output_callback=lambda t: None)
+    set_config(config)
+    agent = AgentLoop(session_db=db, output_callback=lambda t: None)
 
     restored_count = agent.restore_session("sess-restore")
 
@@ -175,7 +181,8 @@ def test_agent_loop_restore_session_rejects_missing_session(tmp_path):
 
     db = SessionDB(tmp_path / "test.db")
     config = AppConfig(llm=LLMConfig(api_key="sk-test"))
-    agent = AgentLoop(config, session_db=db, output_callback=lambda t: None)
+    set_config(config)
+    agent = AgentLoop(session_db=db, output_callback=lambda t: None)
 
     with pytest.raises(ValueError, match="Session not found"):
         agent.restore_session("missing")
@@ -187,7 +194,8 @@ def test_agent_loop_restore_session_requires_session_db():
     import pytest
 
     config = AppConfig(llm=LLMConfig(api_key="sk-test"))
-    agent = AgentLoop(config, output_callback=lambda t: None)
+    set_config(config)
+    agent = AgentLoop(output_callback=lambda t: None)
 
     with pytest.raises(ValueError, match="Session DB not configured"):
         agent.restore_session("sess")
@@ -203,7 +211,8 @@ def test_agent_loop_restore_session_continues_same_session(tmp_path):
     db.append_message("sess-continue", "assistant", content="之前的回答")
 
     config = AppConfig(llm=LLMConfig(api_key="sk-test"))
-    agent = AgentLoop(config, session_db=db, output_callback=lambda t: None)
+    set_config(config)
+    agent = AgentLoop(session_db=db, output_callback=lambda t: None)
     agent.restore_session("sess-continue")
 
     stream_events = _make_stream_events("继续后的回答")

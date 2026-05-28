@@ -139,3 +139,20 @@ def ensure_config_dir() -> Path:
     """确保配置目录存在，返回路径"""
     DEFAULT_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     return DEFAULT_CONFIG_DIR
+
+
+_config: AppConfig | None = None
+
+
+def set_config(config: AppConfig) -> None:
+    """注入全局配置单例"""
+    global _config
+    _config = config
+
+
+def get_config() -> AppConfig:
+    """获取全局配置单例，未注入时自动从默认路径加载"""
+    global _config
+    if _config is None:
+        _config = load_config()
+    return _config

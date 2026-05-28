@@ -89,7 +89,7 @@ def test_main_delegates_logging_setup_to_configure_logging(tmp_path):
     )
 
     with (
-        patch("main.load_config", return_value=config),
+        patch("main.get_config", return_value=config),
         patch("main.ensure_config_dir"),
         patch("main.configure_logging") as configure_logging_mock,
         patch("main.CLIInterface") as cli_interface,
@@ -100,5 +100,5 @@ def test_main_delegates_logging_setup_to_configure_logging(tmp_path):
         main()
 
     configure_logging_mock.assert_called_once_with(str(tmp_path / "logs"))
-    cli_interface.assert_called_once_with(config)
+    cli_interface.assert_called_once_with()
     cli_instance.run.assert_called_once_with()

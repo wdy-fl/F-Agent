@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 from agent.budget import IterationBudget
 from agent.prompt import build_system_prompt
-from config.settings import AppConfig
+from config.settings import get_config
 from context.compressor import ContextCompressor
 from db.session import SessionDB
 from llm.client import LLMClient
@@ -27,10 +27,10 @@ class AgentLoop:
 
     def __init__(
         self,
-        config: AppConfig,
         session_db: SessionDB | None = None,
         output_callback: Callable[[str], None] | None = None,
     ):
+        config = get_config()
         self.llm = LLMClient(config.llm)
         self.config = config
         self.max_iterations = config.llm.max_iterations

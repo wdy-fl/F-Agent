@@ -7,6 +7,7 @@ import re
 
 import pymysql
 
+from config.settings import get_config
 from tools.registry import registry
 
 logger = logging.getLogger(__name__)
@@ -105,8 +106,8 @@ def _get_config() -> dict | None:
     """从全局配置获取 MySQL 连接参数"""
     # 通过 registry 的 _app_config 钩子获取配置
     # 在 CLI 初始化时由 interface.py 注入
-    app_config = getattr(registry, "_app_config", None)
-    if app_config is None or app_config.mysql is None:
+    app_config = get_config()
+    if app_config.mysql is None:
         return None
 
     mysql_cfg = app_config.mysql
