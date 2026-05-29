@@ -142,6 +142,10 @@ python3 -m pytest
 
 测试覆盖 Agent 主循环、CLI 命令、会话持久化、上下文压缩、记忆工具、技能系统、工具注册与安全审批等核心模块。
 
+## 在线文档
+
+详细设计文档与开发指南：[F-Agent 在线文档](https://icnzw2ffzpws.feishu.cn/docx/M4vmdKKD3oQvrxx3HQZcN6qUnLg?from=from_copylink)
+
 ## 路线图能力
 
 以下能力是后续规划，不代表当前版本已经完整实现：
