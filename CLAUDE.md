@@ -55,8 +55,8 @@
 
 | 文档 | 位置 | 说明 |
 |------|------|------|
-| 项目目标 | `docs/GOAL.md` | 项目愿景、学习目标、实现阶段、设计原则 |
-| 架构设计 | `docs/ARCHITECTURE.md` | 整体架构、模块划分、核心流程、数据存储 |
+| 项目目标 | `GOAL.md` | 项目愿景、学习目标、实现阶段、设计原则 |
+| 架构设计 | `ARCHITECTURE.md` | 整体架构、模块划分、核心流程、数据存储 |
 | Agent 开发 SOP | `docs/dev-sop.md` | Agent 开发工作流规范，5原则 + 9环节完整闭环 |
 | 子 Agent Prompt 模板 | `docs/prompt-templates/` | 子 agent 分工的 prompt 模板（implement / explore），分配任务时读取并填充 |
 | 需求对齐与设计 | `docs/superpowers/specs/` | 需求澄清结论与设计方案文档 |

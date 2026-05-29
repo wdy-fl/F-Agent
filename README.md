@@ -1,29 +1,35 @@
 # F-Agent（阿福）
 
-> 可运行、可扩展、可进化的个人智能助手
+> 面向个人研发场景的本地 CLI 智能助手
 
-阿福是一个具备自我学习与进化能力的 AI Agent。它能记忆过往对话、从经验中提炼技能、在交互中持续成长，是你真正意义上的数字伙伴。
+F-Agent（阿福）是一个可运行、可扩展、可进化的个人 Agent。它通过本地 CLI 与用户交互，围绕多轮对话、工具调用、会话持久化、记忆、技能和上下文压缩构建核心闭环。
+
+当前版本聚焦本地研发助手能力，不把路线图能力包装成已完成平台。多平台接入、子 Agent 委托、定时任务、MCP、Web Dashboard 等能力仍处于后续规划阶段。
 
 ## 核心理念
 
-**可运行** — 开箱即用，一条命令启动对话，无需复杂配置。
+**可运行** — 一条命令启动本地 CLI，完成真实对话、工具调用和会话恢复。
 
-**可扩展** — 工具、模型、记忆、平台均采用插件化设计，按需接入、自由组合。
+**可扩展** — 工具、记忆、技能、配置、上下文压缩等能力按模块拆分，便于按需演进。
 
-**可进化** — 闭环学习：对话产生经验 → 经验沉淀为技能 → 技能在使用中自改进 → 更强的能力反哺下一次对话。
+**可进化** — 通过持久记忆、技能沉淀和长上下文压缩，让 Agent 能在使用中积累经验。
 
-## 能力概览
+## 当前能力
 
 | 能力 | 说明 |
 |------|------|
-| 智能对话 | 接入多种 LLM，模型可随时切换 |
-| 工具调用 | 内置终端执行、文件操作、Web 搜索等工具，支持 MCP 协议扩展 |
-| 持久记忆 | 跨会话记忆用户偏好与历史上下文，支持全文搜索召回 |
-| 技能自创 | 完成复杂任务后主动提议提炼可复用技能，渐进式披露在对话中复用 |
-| 上下文压缩 | 长对话自动压缩，在有限 Token 窗口内保持连贯性 |
-| 多平台接入 | 统一消息网关，同一 Agent 同时服务 CLI / Telegram / Web 等多端 |
-| 并行委托 | 将子任务派生给独立 Agent 并行执行，汇总结果 |
-| 定时任务 | 自然语言描述即可创建定时调度，无人值守自动执行 |
+| 智能对话 | 通过 OpenAI SDK 接入兼容模型，支持 `base_url` 切换模型服务 |
+| CLI 交互 | 基于 prompt_toolkit + rich，支持流式输出、历史输入和 Markdown 渲染 |
+| 工具调用 | 内置终端、文件、Web、记忆、技能、MySQL、反思等工具 |
+| 命令审批 | 对高风险终端命令进行检测、阻断或交互式审批 |
+| 会话持久化 | 使用 SQLite 保存会话、消息、工具调用、统计信息和恢复状态 |
+| 历史搜索 | 基于 SQLite FTS5 对历史消息建立全文索引，用于相关上下文召回 |
+| 记忆系统 | 维护 `USER.md`、`MEMORY.md`、`SOUL.md`、`AGENT.md` 等工作区记忆文件 |
+| 上下文围栏 | 使用 `<memory-context>` 区分召回记忆和用户当前输入 |
+| 上下文压缩 | 支持工具结果裁剪、结构化摘要、头尾保护和压缩状态恢复 |
+| 技能系统 | 扫描 `workspace/skills/` 下的 `SKILL.md`，按需加载技能内容 |
+| 技能管理 | 提供技能列表、查看、创建、编辑、删除和外部安装能力 |
+| 会话命令 | 支持 `/help`、`/sessions`、`/resume`、`/stats`、`/clear`、`/quit` |
 
 ## 快速开始
 
@@ -41,62 +47,112 @@ pip install -r requirements.txt
 mkdir -p workspace
 cp config.yaml.example workspace/config.yaml
 
+# 编辑 workspace/config.yaml，填入 llm.api_key
+
 # 启动阿福
 python3 main.py
-# 或使用启动脚本（自动激活虚拟环境）
+# 或使用启动脚本
 ./start.sh          # macOS / Linux
 ./start.ps1         # Windows PowerShell
 ```
 
+也可以安装为开发模式后使用脚本入口：
+
+```bash
+source .venv/bin/activate
+pip install -e ".[dev]"
+fagent
+```
+
+## 配置说明
+
+默认配置文件位于 `workspace/config.yaml`，可从 `config.yaml.example` 复制得到。常用配置包括：
+
+| 配置 | 说明 |
+|------|------|
+| `llm.api_key` | 模型服务 API Key，必填 |
+| `llm.base_url` | OpenAI 兼容接口地址 |
+| `llm.model` | 模型名称 |
+| `llm.context_window` | 上下文窗口大小 |
+| `llm.max_iterations` | 单轮任务最大 ReAct 迭代次数 |
+| `memory.prefetch_limit` | 每轮对话召回的历史消息数量 |
+| `compressor.*` | 上下文压缩阈值、保护区和最小收益配置 |
+| `approval.mode` | 命令审批模式，默认 `manual` |
+| `skills_hub.github_token` | 从 GitHub 安装技能时使用的可选 token |
+| `mysql` | 可选 MySQL 只读查询配置，密码通过环境变量提供 |
+
 ## 项目结构
 
-```
+```text
 F-Agent/
-├── main.py              # 入口
-├── agent/               # Agent 核心
-│   ├── loop.py          # 主循环
-│   ├── prompt.py        # 提示词构建
-│   └── budget.py        # 预算控制
-├── tools/               # 工具集
-│   ├── registry.py      # 工具注册表
-│   ├── terminal.py      # 终端执行
-│   ├── file_ops.py      # 文件操作
-│   ├── web_search.py    # Web 搜索
-│   ├── memory.py        # 记忆读写
-│   └── skill.py         # 技能管理
-├── memory/              # 记忆子系统
-│   ├── manager.py       # 记忆管理器
-│   ├── user_profile.py  # 用户画像
-│   └── context_fence.py # 上下文围栏
-├── skill/               # 技能系统
-│   ├── loader.py        # 技能扫描与索引
-│   └── skill_utils.py   # 共享工具
-├── context/             # 上下文压缩
-│   └── compressor.py
-├── db/                  # 会话持久化
-│   ├── session.py
-│   └── schema.py
-├── config/              # 配置管理
+├── main.py                    # 入口：加载配置并启动 CLI
+├── agent/                     # Agent 核心循环、提示词构建、预算控制
+│   ├── loop.py
+│   ├── prompt.py
+│   └── budget.py
+├── cli/                       # prompt_toolkit + rich 交互界面
+│   └── interface.py
+├── config/                    # YAML 配置加载与默认配置
 │   └── settings.py
-├── workspace/           # 运行时数据
-│   ├── config.yaml
-│   └── skill/           # 技能库
-└── tests/               # 测试
+├── context/                   # 上下文压缩
+│   └── compressor.py
+├── db/                        # SQLite schema、迁移、会话读写
+│   ├── schema.py
+│   └── session.py
+├── llm/                       # OpenAI SDK 封装
+│   └── client.py
+├── memory/                    # 记忆管理与上下文围栏
+│   ├── manager.py
+│   └── context_fence.py
+├── skill/                     # 技能扫描、解析、路径处理
+│   ├── loader.py
+│   └── skill_utils.py
+├── tools/                     # 内置工具与工具注册表
+│   ├── registry.py
+│   ├── terminal.py
+│   ├── file_ops.py
+│   ├── web_search.py
+│   ├── memory.py
+│   ├── skill.py
+│   ├── skill_hub.py
+│   ├── mysql.py
+│   ├── think.py
+│   └── approval.py
+├── tests/                     # pytest 测试
+├── workspace/                 # 运行时配置、数据库、日志、记忆和技能
+├── GOAL.md                    # 项目目标与路线图
+└── ARCHITECTURE.md            # 架构设计文档
 ```
 
-## 技术栈
+## 文档入口
 
-- **语言**: Python 3.11+
-- **LLM**: OpenAI SDK（兼容多模型提供商）
-- **CLI**: prompt_toolkit + rich
-- **存储**: SQLite（WAL + FTS5 全文搜索）
-- **Web**: FastAPI + Vite
-- **浏览器自动化**: Playwright
-- **容器化**: Docker
+| 文档 | 说明 |
+|------|------|
+| `GOAL.md` | 项目定位、当前能力、路线图和设计原则 |
+| `ARCHITECTURE.md` | 分层架构、核心流程、工具、记忆、技能、数据库设计 |
+| `CLAUDE.md` | 项目开发规范、文档路由和子 Agent 分工规范 |
+| `docs/dev-sop.md` | Agent 开发 SOP |
 
-## 在线文档
+## 测试
 
-详细设计文档与开发指南：[F-Agent 在线文档](https://icnzw2ffzpws.feishu.cn/docx/M4vmdKKD3oQvrxx3HQZcN6qUnLg?from=from_copylink)
+```bash
+source .venv/bin/activate
+python3 -m pytest
+```
+
+测试覆盖 Agent 主循环、CLI 命令、会话持久化、上下文压缩、记忆工具、技能系统、工具注册与安全审批等核心模块。
+
+## 路线图能力
+
+以下能力是后续规划，不代表当前版本已经完整实现：
+
+- 多平台消息网关（Telegram / Discord / Web 等）。
+- 子 Agent 派生、并行委托和结果汇总。
+- Cron / 自然语言定时任务调度。
+- MCP 协议接入。
+- Web Dashboard 与 IDE 集成。
+- Docker / SSH / 云沙箱等多环境执行后端。
+- 语音交互和 RL 训练环境。
 
 ## 作者
 
