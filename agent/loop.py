@@ -77,7 +77,7 @@ class AgentLoop:
         self.session_id: str | None = None
         self.budget = IterationBudget(self.max_iterations)
         self.turn_count = 0
-        self._pending_nudge: str | None = None
+        self._turns_since_sync = 0
 
     def run(self, user_message: str) -> str:
         """运行一轮对话，返回最终回复文本
@@ -95,11 +95,6 @@ class AgentLoop:
             self.session_db.update_turn_count(self.session_id, self.turn_count)
 
         original_message = user_message
-
-        if self._pending_nudge:
-            nudge = self._pending_nudge
-            self._pending_nudge = None
-            user_message = user_message + "\n\n[系统提醒] " + nudge
 
         self._ensure_conversation_started(user_message)
         logger.debug("会话已初始化, session_id=%s", self.session_id)
@@ -166,7 +161,7 @@ class AgentLoop:
             if not response.get("tool_calls"):
                 self._persist_assistant_message(response)
                 result = response.get("content", "")
-                self._sync_memory(user_message, result)
+                self._sync_memory()
                 logger.info("=== run 结束, 无工具调用, result=%s", result)
                 return result
 
@@ -199,7 +194,7 @@ class AgentLoop:
         # 预算耗尽
         logger.warning("预算已耗尽, max_iterations=%d, 进入兜底调用", self.max_iterations)
         result = self._grace_call()
-        self._sync_memory(user_message, result)
+        self._sync_memory()
         logger.info("=== run 结束, 兜底调用完成, result=%s", result)
         return result
 
@@ -242,12 +237,33 @@ class AgentLoop:
             )
 
 
-    def _sync_memory(self, user_message: str, assistant_message: str) -> None:
-        """同步记忆：LLM 判断本轮是否有值得记住的信息 → 精准 nudge"""
-        if self.memory_manager and self.session_id:
-            nudge = self.memory_manager.sync(self.session_id, user_message, assistant_message)
-            if nudge:
-                self._pending_nudge = nudge
+    def _sync_memory(self) -> None:
+        """每 nudge_interval 轮触发一次记忆提取与持久化"""
+        if not self.memory_manager or not self.session_id:
+            return
+
+        self._turns_since_sync += 1
+        if self._turns_since_sync < self.config.memory.nudge_interval:
+            return
+
+        self._turns_since_sync = 0
+
+        recent = self._get_recent_conversation(self.config.memory.nudge_interval)
+        if not recent:
+            return
+
+        self.memory_manager.sync(self.session_id, recent)
+
+    def _get_recent_conversation(self, n_turns: int) -> list[dict]:
+        """从 self.messages 提取最近 n 轮 user+assistant 对话"""
+        pairs: list[dict] = []
+        for msg in reversed(self.messages):
+            if msg.get("role") in ("user", "assistant"):
+                pairs.append(msg)
+                if len(pairs) >= n_turns * 2:
+                    break
+        pairs.reverse()
+        return pairs
 
     def _estimate_total_tokens(self) -> int:
         """估算当前消息列表的总 token 数"""
@@ -337,6 +353,13 @@ class AgentLoop:
         for i, result in enumerate(results):
             tool_name = tool_calls[i]["function"]["name"] if i < len(tool_calls) else "unknown"
             logger.info("工具 %s 结果: %s", tool_name, result.get("content", "")[:100])
+
+        # LLM 主动调用 memory 工具时重置计数器
+        for tc in tool_calls:
+            if tc["function"]["name"] == "memory":
+                self._turns_since_sync = 0
+                break
+
         return results
 
     def _persist_assistant_message(self, response: dict[str, Any]) -> None:

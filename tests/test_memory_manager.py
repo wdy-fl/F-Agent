@@ -107,20 +107,53 @@ def test_append_to_memory_triggers_consolidation(tmp_path):
     assert mock_llm.chat.called
 
 
-def test_sync_returns_nudge(tmp_path):
-    path = tmp_path / "USER.md"
+def test_sync_extracts_and_writes_profile(tmp_path):
+    profile_path = tmp_path / "USER.md"
+    profile_path.write_text("", encoding="utf-8")
     mock_llm = MagicMock()
-    mock_llm.chat.return_value = {"content": '{"has_info": true, "nudge": "你提到偏好 VS Code，要保存吗？"}'}
-    mgr = MemoryManager(MagicMock(), str(path), llm=mock_llm)
-    result = mgr.sync("sess-1", "我喜欢用 VS Code", "好的，已记录")
-    assert result is not None
-    assert "VS Code" in result
+    mock_llm.chat.return_value = {
+        "content": '{"extractions": [{"target": "profile", "content": "用户偏好 VS Code"}]}'
+    }
+    mgr = MemoryManager(MagicMock(), str(profile_path), llm=mock_llm)
+    mgr.sync("sess-1", [
+        {"role": "user", "content": "我喜欢用 VS Code"},
+        {"role": "assistant", "content": "好的，记住了"},
+    ])
+    # update_profile 被调用，会触发第二次 LLM chat（合并 prompt）
+    assert mock_llm.chat.call_count >= 1
 
 
-def test_sync_returns_none_when_no_info(tmp_path):
-    path = tmp_path / "USER.md"
+def test_sync_extracts_and_appends_memory(tmp_path):
+    profile_path = tmp_path / "USER.md"
+    memory_path = tmp_path / "MEMORY.md"
     mock_llm = MagicMock()
-    mock_llm.chat.return_value = {"content": '{"has_info": false}'}
-    mgr = MemoryManager(MagicMock(), str(path), llm=mock_llm)
-    result = mgr.sync("sess-1", "你好", "你好")
-    assert result is None
+    mock_llm.chat.return_value = {
+        "content": '{"extractions": [{"target": "memory", "content": "项目使用 FastAPI"}]}'
+    }
+    mgr = MemoryManager(MagicMock(), str(profile_path), memory_path=str(memory_path), llm=mock_llm)
+    mgr.sync("sess-1", [
+        {"role": "user", "content": "我们后端用的是 FastAPI"},
+        {"role": "assistant", "content": "了解"},
+    ])
+    content = memory_path.read_text(encoding="utf-8")
+    assert "项目使用 FastAPI" in content
+
+
+def test_sync_no_extractions_does_nothing(tmp_path):
+    profile_path = tmp_path / "USER.md"
+    profile_path.write_text("原始内容", encoding="utf-8")
+    mock_llm = MagicMock()
+    mock_llm.chat.return_value = {"content": '{"extractions": []}'}
+    mgr = MemoryManager(MagicMock(), str(profile_path), llm=mock_llm)
+    mgr.sync("sess-1", [
+        {"role": "user", "content": "你好"},
+        {"role": "assistant", "content": "你好"},
+    ])
+    assert profile_path.read_text(encoding="utf-8") == "原始内容"
+
+
+def test_sync_without_llm_does_nothing(tmp_path):
+    profile_path = tmp_path / "USER.md"
+    mgr = MemoryManager(MagicMock(), str(profile_path), llm=None)
+    mgr.sync("sess-1", [{"role": "user", "content": "hello"}])
+    # 不应抛异常

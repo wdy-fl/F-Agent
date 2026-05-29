@@ -1,5 +1,6 @@
 """记忆管理器：prefetch + sync + 四个持久化文件的 LLM 合并读写"""
 
+import json as _json
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -110,34 +111,76 @@ class MemoryManager:
 
     # ---- sync ----
 
-    def sync(self, session_id: str, user_msg: str, assistant_msg: str) -> str | None:
-        """每轮结束后判断是否有值得记住的新信息，返回精准 nudge 或 None"""
-        if not self.llm:
-            return None
+    SYNC_EXTRACT_PROMPT = """分析以下最近几轮对话，提取值得持久化保存的信息。
+关注：用户偏好、项目约定、重要决策、新学到的知识点、工作流习惯。
+忽略：临时性讨论、代码细节、已完成的任务步骤、与已有记忆重复的信息。
 
-        prompt = (
-            "分析以下一轮对话，判断是否有值得持久化保存的新信息"
-            "（用户偏好、项目约定、重要决策、新知识点等）。\n\n"
-            f"用户：{user_msg[:500]}\n助手：{assistant_msg[:500]}\n\n"
-            "如果有值得保存的信息，输出一行 JSON：\n"
-            '{"has_info": true, "nudge": "精准提醒文本", "action": "update_profile|append_memory|update_soul|update_agent"}\n'
-            "如果没有，输出：\n"
-            '{"has_info": false}'
+对话内容：
+{conversation_text}
+
+当前已有记忆摘要：
+- USER.md: {profile_summary}
+- MEMORY.md: {memory_summary}
+
+输出 JSON（不要输出其他内容）：
+{{"extractions": [{{"target": "profile|memory", "content": "要保存的信息"}}]}}
+如果没有值得保存的信息，输出：
+{{"extractions": []}}"""
+
+    def sync(self, session_id: str, recent_messages: list[dict]) -> None:
+        """分析最近几轮对话，提取值得持久化的信息并直接写入文件"""
+        if not self.llm:
+            return
+
+        conversation_text = self._format_messages(recent_messages)
+        if not conversation_text:
+            return
+
+        profile_summary = self.get_user_profile()[:300] or "（暂无）"
+        memory_summary = self.get_memory()[:300] or "（暂无）"
+
+        prompt = self.SYNC_EXTRACT_PROMPT.format(
+            conversation_text=conversation_text,
+            profile_summary=profile_summary,
+            memory_summary=memory_summary,
         )
 
         try:
-            import json as _json
             result = self.llm.chat(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
             )
             content = result.get("content", "").strip()
             data = _json.loads(content)
-            if data.get("has_info"):
-                return data.get("nudge", "")
+            extractions = data.get("extractions", [])
+
+            for item in extractions:
+                target = item.get("target", "")
+                text = item.get("content", "").strip()
+                if not text:
+                    continue
+                if target == "profile":
+                    self.update_profile(text)
+                    logger.info("sync: 自动更新 profile")
+                elif target == "memory":
+                    self.append_to_memory(text)
+                    logger.info("sync: 自动追加 memory")
+                else:
+                    logger.debug("sync: 忽略未知 target=%s", target)
         except Exception:
-            logger.debug("sync LLM judgment failed", exc_info=True)
-        return None
+            logger.debug("sync extraction failed", exc_info=True)
+
+    @staticmethod
+    def _format_messages(messages: list[dict]) -> str:
+        """将消息列表格式化为对话文本"""
+        lines = []
+        for msg in messages:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            if role in ("user", "assistant") and content:
+                label = "[user]" if role == "user" else "[assistant]"
+                lines.append(f"{label}: {content[:500]}")
+        return "\n".join(lines)
 
     # ---- read methods ----
 
