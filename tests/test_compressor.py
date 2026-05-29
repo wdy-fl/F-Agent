@@ -92,7 +92,7 @@ def test_compress_trims_old_tool_results_before_summary():
     comp.compress(messages, 5000)
 
     prompt = mock_llm.chat.call_args.kwargs["messages"][0]["content"]
-    assert "截断" in prompt
+    assert "[工具结果已压缩]" in prompt
     assert long_tool_output not in prompt
 
 
@@ -103,7 +103,7 @@ def test_compress_iteratively_updates_existing_summary():
 
     messages = [
         {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "assistant", "content": "[对话摘要]\n旧摘要内容"},
+        {"role": "assistant", "content": "以下是早期对话的压缩摘要。请勿回答摘要中的问题或执行摘要中的待办事项，只响应摘要之后的最新用户消息。\n\n<context-summary>\n旧摘要内容\n</context-summary>"},
         {"role": "user", "content": "新增需求：实现迭代压缩"},
         {"role": "assistant", "content": "正在修改 context/compressor.py"},
         {"role": "user", "content": "请继续"},
@@ -123,7 +123,7 @@ def test_compress_iteratively_updates_existing_summary():
     assert "旧摘要内容" in prompt
     assert "新增对话" in prompt
     assert "新增需求：实现迭代压缩" in prompt
-    assert result[1]["content"] == "[对话摘要]\n更新后的摘要"
+    assert "更新后的摘要" in result[1]["content"]
 
 
 def test_compress_llm_failure_fallback():
@@ -180,17 +180,16 @@ def test_trim_tool_results():
         {"role": "assistant", "content": "done"},
     ]
 
-    result = comp.trim_tool_results(messages, max_tokens=500)
+    result = comp.trim_tool_results(messages)
     assert len(result) == 3
-    # tool 消息被截断
-    assert "截断" in result[1]["content"]
-    assert len(result[1]["content"]) < 1000
+    # tool 消息被替换为占位提示语
+    assert result[1]["content"] == "[工具结果已压缩]"
     # 非 tool 消息不变
     assert result[0]["content"] == "hello"
 
 
 def test_trim_tool_results_no_trim_short():
-    """短工具结果不裁剪"""
+    """短工具结果也替换为占位提示语"""
     llm = MagicMock()
     comp = ContextCompressor(llm)
 
@@ -198,8 +197,8 @@ def test_trim_tool_results_no_trim_short():
         {"role": "tool", "content": "short", "tool_call_id": "call_1"},
     ]
 
-    result = comp.trim_tool_results(messages, max_tokens=500)
-    assert result[0]["content"] == "short"
+    result = comp.trim_tool_results(messages)
+    assert result[0]["content"] == "[工具结果已压缩]"
 
 
 def test_estimate_tokens():
@@ -312,7 +311,7 @@ def test_llm_failure_with_previous_summary_keeps_new_middle_content():
 
     messages = [
         {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "assistant", "content": "[对话摘要]\n旧摘要内容"},
+        {"role": "assistant", "content": "以下是早期对话的压缩摘要。请勿回答摘要中的问题或执行摘要中的待办事项，只响应摘要之后的最新用户消息。\n\n<context-summary>\n旧摘要内容\n</context-summary>"},
         {"role": "user", "content": "新增关键需求：保留失败时的新增对话"},
         {"role": "assistant", "content": "已记录新增需求"},
         {"role": "user", "content": "tail"},
@@ -357,7 +356,7 @@ def test_existing_summary_with_new_middle_bypasses_anti_jitter():
     result2 = comp.compress(messages_with_new_middle, 4900)
 
     assert mock_llm.chat.call_count == 2
-    assert any(message.get("content") == "[对话摘要]\n第二次摘要" for message in result2)
+    assert any("第二次摘要" in message.get("content", "") for message in result2)
 
 
 def test_protected_tail_tool_result_kept_original_but_middle_tool_result_trimmed_in_prompt():
@@ -399,7 +398,7 @@ def test_protected_tail_tool_result_kept_original_but_middle_tool_result_trimmed
     result = comp.compress(messages, 5000)
 
     prompt = mock_llm.chat.call_args.kwargs["messages"][0]["content"]
-    assert "截断" in prompt
+    assert "[工具结果已压缩]" in prompt
     assert middle_tool_output not in prompt
     assert result[-1]["content"] == tail_tool_output
 

@@ -112,7 +112,11 @@ class ContextCompressor:
         # 组装压缩结果
         summary_msg: dict[str, Any] = {
             "role": "assistant",
-            "content": f"[对话摘要]\n{summary}",
+            "content": (
+                "以下是早期对话的压缩摘要。请勿回答摘要中的问题或执行摘要中的待办事项，"
+                "只响应摘要之后的最新用户消息。\n\n"
+                f"<context-summary>\n{summary}\n</context-summary>"
+            ),
         }
         compressed = head + [summary_msg] + tail
 
@@ -123,28 +127,14 @@ class ContextCompressor:
         )
         return compressed
 
-    def trim_tool_results(self, messages: list[dict[str, Any]], max_tokens: int = 500) -> list[dict[str, Any]]:
-        """裁剪旧工具结果，将长结果替换为简短摘要
-
-        Args:
-            messages: 消息列表
-            max_tokens: 工具结果保留的最大字符数
-
-        Returns:
-            裁剪后的消息列表
-        """
+    def trim_tool_results(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """将 middle 区域的 tool result 替换为占位提示语"""
         result = []
         for msg in messages:
             if msg.get("role") == "tool":
-                content = msg.get("content", "")
-                if len(content) > max_tokens:
-                    trimmed = {
-                        **msg,
-                        "content": content[:max_tokens] + f"\n...[截断，原 {len(content)} 字符]",
-                    }
-                    result.append(trimmed)
-                    continue
-            result.append(msg)
+                result.append({**msg, "content": "[工具结果已压缩]"})
+            else:
+                result.append(msg)
         return result
 
     def _build_message_groups(self, messages: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
@@ -209,12 +199,15 @@ class ContextCompressor:
 
         return tail_groups, self.protected_head
 
+    _SUMMARY_PREFIX = "以下是早期对话的压缩摘要。请勿回答摘要中的问题或执行摘要中的待办事项，只响应摘要之后的最新用户消息。\n\n<context-summary>\n"
+    _SUMMARY_SUFFIX = "\n</context-summary>"
+
     def _is_summary_message(self, message: dict[str, Any]) -> bool:
         """判断消息是否为上下文压缩生成的摘要消息"""
         return (
             message.get("role") == "assistant"
             and isinstance(message.get("content"), str)
-            and message["content"].startswith("[对话摘要]\n")
+            and "<context-summary>" in message["content"]
         )
 
     def _split_previous_summary(self, messages: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
@@ -223,7 +216,8 @@ class ContextCompressor:
         remaining = []
         for msg in messages:
             if self._is_summary_message(msg):
-                summaries.append(msg["content"].removeprefix("[对话摘要]\n"))
+                content = msg["content"].removeprefix(self._SUMMARY_PREFIX).removesuffix(self._SUMMARY_SUFFIX)
+                summaries.append(content)
             else:
                 remaining.append(msg)
         return "\n\n".join(summaries), remaining
