@@ -73,6 +73,22 @@ MEMORY_CONSOLIDATE_PROMPT = """你正在整理 Agent 的持久化笔记（MEMORY
 
 请输出整理后的笔记（仅输出内容，无需解释）："""
 
+SYNC_EXTRACT_PROMPT = """分析以下最近几轮对话，提取值得持久化保存的信息。
+关注：用户偏好、项目约定、重要决策、新学到的知识点、工作流习惯。
+忽略：临时性讨论、代码细节、已完成的任务步骤、与已有记忆重复的信息。
+
+对话内容：
+{conversation_text}
+
+当前已有记忆摘要：
+- USER.md: {profile_summary}
+- MEMORY.md: {memory_summary}
+
+输出 JSON（不要输出其他内容）：
+{{"extractions": [{{"target": "profile|memory", "content": "要保存的信息"}}]}}
+如果没有值得保存的信息，输出：
+{{"extractions": []}}"""
+
 
 class MemoryManager:
     """记忆管理器，统一管理四个持久化文件的读写和 LLM 合并"""
@@ -111,22 +127,6 @@ class MemoryManager:
 
     # ---- sync ----
 
-    SYNC_EXTRACT_PROMPT = """分析以下最近几轮对话，提取值得持久化保存的信息。
-关注：用户偏好、项目约定、重要决策、新学到的知识点、工作流习惯。
-忽略：临时性讨论、代码细节、已完成的任务步骤、与已有记忆重复的信息。
-
-对话内容：
-{conversation_text}
-
-当前已有记忆摘要：
-- USER.md: {profile_summary}
-- MEMORY.md: {memory_summary}
-
-输出 JSON（不要输出其他内容）：
-{{"extractions": [{{"target": "profile|memory", "content": "要保存的信息"}}]}}
-如果没有值得保存的信息，输出：
-{{"extractions": []}}"""
-
     def sync(self, session_id: str, recent_messages: list[dict]) -> None:
         """分析最近几轮对话，提取值得持久化的信息并直接写入文件"""
         if not self.llm:
@@ -139,7 +139,7 @@ class MemoryManager:
         profile_summary = self.get_user_profile()[:300] or "（暂无）"
         memory_summary = self.get_memory()[:300] or "（暂无）"
 
-        prompt = self.SYNC_EXTRACT_PROMPT.format(
+        prompt = SYNC_EXTRACT_PROMPT.format(
             conversation_text=conversation_text,
             profile_summary=profile_summary,
             memory_summary=memory_summary,
