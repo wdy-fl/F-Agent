@@ -2,6 +2,7 @@
 
 import json
 import logging
+import signal
 import uuid
 from pathlib import Path
 from typing import Any, Callable
@@ -20,6 +21,10 @@ from tools.skill import set_skills_dir
 from tools.skill_hub import set_skills_dir as set_skill_hub_dir, set_github_token
 
 logger = logging.getLogger(__name__)
+
+
+class LLMStreamTimeoutError(TimeoutError):
+    pass
 
 
 class AgentLoop:
@@ -293,18 +298,45 @@ class AgentLoop:
         finish_reason = None
         reasoning_content = None
         usage = None
+        timeout_seconds = self.config.llm.request_timeout
+        previous_handler = None
 
-        for event in self.llm.chat_stream(self.message_list, tools=tools):
-            if event["type"] == "content_delta":
-                content_parts.append(event["content"])
-                self.output_callback(event["content"])
-            elif event["type"] == "reasoning_delta":
-                self.output_callback(event["content"])
-            elif event["type"] == "done":
-                tool_calls = event.get("tool_calls")
-                finish_reason = event.get("finish_reason", "stop")
-                reasoning_content = event.get("reasoning_content")
-                usage = event.get("usage")
+        def _raise_timeout(_signum, _frame):
+            raise LLMStreamTimeoutError(
+                f"LLM 调用超过 {timeout_seconds} 秒未完成，已中断。"
+            )
+
+        try:
+            if timeout_seconds > 0:
+                previous_handler = signal.getsignal(signal.SIGALRM)
+                signal.signal(signal.SIGALRM, _raise_timeout)
+                signal.setitimer(signal.ITIMER_REAL, timeout_seconds)
+
+            for event in self.llm.chat_stream(self.message_list, tools=tools):
+                if event["type"] == "content_delta":
+                    content_parts.append(event["content"])
+                    self.output_callback(event["content"])
+                elif event["type"] == "reasoning_delta":
+                    self.output_callback(event["content"])
+                elif event["type"] == "done":
+                    tool_calls = event.get("tool_calls")
+                    finish_reason = event.get("finish_reason", "stop")
+                    reasoning_content = event.get("reasoning_content")
+                    usage = event.get("usage")
+                    if finish_reason == "error" and event.get("content"):
+                        content_parts = [event["content"]]
+        except LLMStreamTimeoutError as e:
+            logger.error("LLM 流式调用超时: %s", e)
+            return {
+                "content": str(e),
+                "tool_calls": None,
+                "finish_reason": "error",
+            }
+        finally:
+            if timeout_seconds > 0:
+                signal.setitimer(signal.ITIMER_REAL, 0)
+                if previous_handler is not None:
+                    signal.signal(signal.SIGALRM, previous_handler)
 
         full_content = "".join(content_parts)
         self.output_callback("\n")

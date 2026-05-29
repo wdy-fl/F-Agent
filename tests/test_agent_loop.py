@@ -1,5 +1,6 @@
 """Agent 主循环冒烟测试：验证最小循环可运行"""
 
+import time
 from unittest.mock import patch
 
 from pathlib import Path
@@ -148,6 +149,50 @@ def test_agent_loop_preserves_reasoning_content():
     assistant_msgs = [m for m in agent.message_list if m["role"] == "assistant"]
     assert len(assistant_msgs) == 1
     assert assistant_msgs[0].get("reasoning_content") == "I should greet the user"
+
+
+def test_call_llm_stream_preserves_error_event_content():
+    """流式错误事件的内容应作为错误响应返回。"""
+    config = AppConfig(llm=LLMConfig(api_key="sk-test"))
+    set_config(config)
+    agent = AgentLoop(output_callback=lambda t: None)
+    agent.message_list = [{"role": "system", "content": "system"}]
+
+    stream_events = iter([{
+        "type": "done",
+        "finish_reason": "error",
+        "content": "连接异常：read timeout",
+    }])
+
+    with patch.object(agent.llm, "chat_stream", return_value=stream_events):
+        response = agent._call_llm_stream()
+
+    assert response["finish_reason"] == "error"
+    assert response["content"] == "连接异常：read timeout"
+    assert len(agent.message_list) == 1
+
+
+def test_call_llm_stream_stops_when_request_timeout_exceeded():
+    """单次流式 LLM 调用超过 request_timeout 后应返回错误。"""
+    config = AppConfig(llm=LLMConfig(api_key="sk-test", request_timeout=1.0))
+    set_config(config)
+    agent = AgentLoop(output_callback=lambda t: None)
+    agent.message_list = [{"role": "system", "content": "system"}]
+
+    def slow_stream():
+        yield {"type": "content_delta", "content": "开头"}
+        time.sleep(2.0)
+        yield {"type": "content_delta", "content": "后续"}
+
+    start = time.monotonic()
+    with patch.object(agent.llm, "chat_stream", return_value=slow_stream()):
+        response = agent._call_llm_stream()
+    elapsed = time.monotonic() - start
+
+    assert elapsed < 1.8
+    assert response["finish_reason"] == "error"
+    assert response["content"] == "LLM 调用超过 1.0 秒未完成，已中断。"
+    assert len(agent.message_list) == 1
 
 
 def test_agent_loop_restore_session_loads_persisted_messages(tmp_path):
