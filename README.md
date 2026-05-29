@@ -94,9 +94,13 @@ F-Agent/
 - **浏览器自动化**: Playwright
 - **容器化**: Docker
 
-## 灵感来源
+## 在线文档
 
-F-Agent 的架构设计受 [Hermes-Agent](https://github.com/nousresearch/hermes-agent) 启发，在理解其核心机制的基础上，以更简洁的方式重新实现，聚焦个人助手场景。
+详细设计文档与开发指南：[F-Agent 在线文档](https://icnzw2ffzpws.feishu.cn/docx/M4vmdKKD3oQvrxx3HQZcN6qUnLg?from=from_copylink)
+
+## 作者
+
+邮箱：1839519776@qq.com
 
 ## License
 
