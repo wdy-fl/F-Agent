@@ -25,6 +25,7 @@ def handle_memory(args: dict) -> str:
 
     Actions:
         search: FTS5 全文搜索历史消息
+        read_profile: 读取用户画像
         update_profile: LLM 驱动的画像更新
         read_memory / append_memory: Agent 笔记读写
         read_soul / update_soul: 身份描述读写
@@ -41,6 +42,12 @@ def handle_memory(args: dict) -> str:
             return json.dumps({"error": "Memory manager not available"}, ensure_ascii=False)
         results = _memory_manager.session_db.search_messages(query, limit=limit)
         return json.dumps(results, ensure_ascii=False, default=str)
+
+    elif action == "read_profile":
+        if not _memory_manager:
+            return json.dumps({"error": "Memory manager not available"}, ensure_ascii=False)
+        content = _memory_manager.get_user_profile()
+        return json.dumps({"content": content}, ensure_ascii=False)
 
     elif action == "update_profile":
         observations = args.get("observations", "")
@@ -100,7 +107,7 @@ def handle_memory(args: dict) -> str:
         return json.dumps({
             "error": f"Unknown action: {action}",
             "available_actions": [
-                "search", "update_profile", "read_memory", "append_memory",
+                "search", "read_profile", "update_profile", "read_memory", "append_memory",
                 "read_soul", "update_soul", "read_agent", "update_agent",
             ],
         }, ensure_ascii=False)
@@ -112,14 +119,14 @@ registry.register(
         "type": "function",
         "function": {
             "name": "memory",
-            "description": "管理持久化记忆和工作区文件。search=搜索历史对话，update_profile=LLM合并更新用户画像，read_memory/append_memory=读写Agent笔记，read_soul/update_soul=读写身份描述，read_agent/update_agent=读写行为指引",
+            "description": "管理持久化记忆和工作区文件。search=搜索历史对话，read_profile=读取用户画像，update_profile=LLM合并更新用户画像，read_memory/append_memory=读写Agent笔记，read_soul/update_soul=读写身份描述，read_agent/update_agent=读写行为指引",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "action": {
                         "type": "string",
                         "description": "操作类型",
-                        "enum": ["search", "update_profile", "read_memory", "append_memory", "read_soul", "update_soul", "read_agent", "update_agent"],
+                        "enum": ["search", "read_profile", "update_profile", "read_memory", "append_memory", "read_soul", "update_soul", "read_agent", "update_agent"],
                     },
                     "query": {
                         "type": "string",

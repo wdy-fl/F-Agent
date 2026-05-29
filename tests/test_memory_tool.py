@@ -13,6 +13,7 @@ def setup_manager():
     mock_memory.update_profile.return_value = "更新后的画像"
     mock_memory.update_soul.return_value = "更新后的身份"
     mock_memory.update_agent.return_value = "更新后的指引"
+    mock_memory.get_user_profile.return_value = "用户画像内容"
     mock_memory.get_memory.return_value = "笔记内容"
     mock_memory.get_soul.return_value = "身份内容"
     mock_memory.get_agent.return_value = "指引内容"
@@ -60,6 +61,14 @@ def test_handle_update_profile_no_observations():
     import json
     result = json.loads(handle_memory({"action": "update_profile"}))
     assert "error" in result
+
+
+def test_handle_read_profile():
+    mock_memory = setup_manager()
+    import json
+    result = json.loads(handle_memory({"action": "read_profile"}))
+    assert result["content"] == "用户画像内容"
+    mock_memory.get_user_profile.assert_called_once_with()
 
 
 def test_handle_read_memory():
@@ -116,7 +125,7 @@ def test_save_action_removed():
 def test_no_manager_returns_error():
     set_managers(memory_manager=None)
     import json
-    for action in ["update_profile", "read_memory", "append_memory", "read_soul", "update_soul", "read_agent", "update_agent"]:
+    for action in ["update_profile", "read_profile", "read_memory", "append_memory", "read_soul", "update_soul", "read_agent", "update_agent"]:
         args = {"action": action}
         if action in ("update_profile",):
             args["observations"] = "x"
