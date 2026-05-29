@@ -285,5 +285,4 @@ registry.register(
         },
     },
     handler=handle_skill_hub_install,
-    parallel_safe=False,
 )

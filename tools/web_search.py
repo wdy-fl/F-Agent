@@ -120,7 +120,6 @@ registry.register(
         },
     },
     handler=web_search,
-    parallel_safe=True,
 )
 
 registry.register(
@@ -141,5 +140,4 @@ registry.register(
         },
     },
     handler=web_fetch,
-    parallel_safe=True,
 )

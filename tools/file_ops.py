@@ -135,7 +135,6 @@ registry.register(
         },
     },
     handler=read_file,
-    parallel_safe=True,
 )
 
 registry.register(
@@ -157,7 +156,6 @@ registry.register(
         },
     },
     handler=write_file,
-    parallel_safe=False,
 )
 
 registry.register(
@@ -178,5 +176,4 @@ registry.register(
         },
     },
     handler=list_files,
-    parallel_safe=True,
 )

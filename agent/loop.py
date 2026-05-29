@@ -347,7 +347,7 @@ class AgentLoop:
             工具结果消息列表
         """
         logger.info("正在执行 %d 个工具调用", len(tool_calls))
-        results = registry.dispatch_parallel(tool_calls)
+        results = registry.dispatch_batch(tool_calls)
         for i, result in enumerate(results):
             tool_name = tool_calls[i]["function"]["name"] if i < len(tool_calls) else "unknown"
             logger.info("工具 %s 结果: %s", tool_name, result.get("content", "")[:100])

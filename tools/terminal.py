@@ -76,5 +76,4 @@ registry.register(
         },
     },
     handler=run_terminal,
-    parallel_safe=False,
 )

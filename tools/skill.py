@@ -208,7 +208,6 @@ registry.register(
         },
     },
     handler=handle_skills_list,
-    parallel_safe=True,
 )
 
 registry.register(
@@ -229,7 +228,6 @@ registry.register(
         },
     },
     handler=handle_skill_view,
-    parallel_safe=True,
 )
 
 registry.register(
@@ -266,5 +264,4 @@ registry.register(
         },
     },
     handler=handle_skill_manage,
-    parallel_safe=False,
 )

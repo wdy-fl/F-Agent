@@ -9,7 +9,6 @@ from tools.registry import ToolRegistry, registry as global_registry
 def _clean_registry():
     """清空全局注册表并重载工具模块（测试用）"""
     global_registry._tools.clear()
-    global_registry._generation = 0
 
 
 def test_register_and_dispatch():
@@ -19,7 +18,6 @@ def test_register_and_dispatch():
         name="echo",
         schema={"type": "function", "function": {"name": "echo", "parameters": {}}},
         handler=lambda args: json.dumps({"echo": args.get("msg", "")}),
-        parallel_safe=True,
     )
 
     assert reg.has_tool("echo")
@@ -47,7 +45,6 @@ def test_dispatch_tool_error():
         name="fail_tool",
         schema={"type": "function", "function": {"name": "fail_tool", "parameters": {}}},
         handler=fail_handler,
-        parallel_safe=True,
     )
 
     result = reg.dispatch("fail_tool", {})
@@ -69,7 +66,6 @@ def test_result_truncation():
         name="verbose_tool",
         schema={"type": "function", "function": {"name": "verbose_tool", "parameters": {}}},
         handler=verbose_handler,
-        parallel_safe=True,
         max_result_size=100,
     )
 
@@ -78,8 +74,8 @@ def test_result_truncation():
     assert "truncated" in result
 
 
-def test_parallel_dispatch_executes_calls_serially_in_original_order():
-    """测试历史并行方法名下，工具仍按 LLM 返回顺序串行执行"""
+def test_dispatch_batch_executes_calls_serially_in_original_order():
+    """测试批量调度按 LLM 返回顺序串行执行"""
     reg = ToolRegistry()
 
     call_order = []
@@ -96,13 +92,11 @@ def test_parallel_dispatch_executes_calls_serially_in_original_order():
         name="safe_read",
         schema={"type": "function", "function": {"name": "safe_read", "parameters": {}}},
         handler=safe_handler,
-        parallel_safe=True,
     )
     reg.register(
         name="unsafe_write",
         schema={"type": "function", "function": {"name": "unsafe_write", "parameters": {}}},
         handler=unsafe_handler,
-        parallel_safe=False,
     )
 
     tool_calls = [
@@ -111,14 +105,14 @@ def test_parallel_dispatch_executes_calls_serially_in_original_order():
         {"id": "call_3", "function": {"name": "unsafe_write", "arguments": '{"id": 3}'}},
     ]
 
-    results = reg.dispatch_parallel(tool_calls)
+    results = reg.dispatch_batch(tool_calls)
 
     assert call_order == ["unsafe_1", "safe_2", "unsafe_3"]
     assert [r["role"] for r in results] == ["tool", "tool", "tool"]
     assert [r["tool_call_id"] for r in results] == ["call_1", "call_2", "call_3"]
 
 
-def test_parallel_dispatch_continues_after_invalid_json_arguments():
+def test_dispatch_batch_continues_after_invalid_json_arguments():
     """测试非法 JSON 参数返回错误结果，后续合法调用继续执行"""
     reg = ToolRegistry()
 
@@ -132,7 +126,6 @@ def test_parallel_dispatch_continues_after_invalid_json_arguments():
         name="echo",
         schema={"type": "function", "function": {"name": "echo", "parameters": {}}},
         handler=handler,
-        parallel_safe=True,
     )
 
     tool_calls = [
@@ -140,7 +133,7 @@ def test_parallel_dispatch_continues_after_invalid_json_arguments():
         {"id": "call_2", "function": {"name": "echo", "arguments": '{"msg": "hello"}'}},
     ]
 
-    results = reg.dispatch_parallel(tool_calls)
+    results = reg.dispatch_batch(tool_calls)
 
     assert [r["tool_call_id"] for r in results] == ["call_1", "call_2"]
     assert json.loads(results[0]["content"]) == {"error": "Invalid JSON arguments"}
@@ -166,9 +159,6 @@ def test_builtin_tools_registered():
     assert global_registry.has_tool("web_search")
     assert global_registry.has_tool("web_fetch")
 
-    # parallel_safe 元数据保留，但当前调度器严格串行执行
-    assert not global_registry._tools["terminal"].parallel_safe
-    assert global_registry._tools["read_file"].parallel_safe
 
 
 def test_terminal_tool():

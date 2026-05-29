@@ -156,5 +156,4 @@ registry.register(
         },
     },
     handler=mysql_query,
-    parallel_safe=True,
 )

@@ -144,5 +144,4 @@ registry.register(
         },
     },
     handler=handle_memory,
-    parallel_safe=False,
 )

@@ -42,5 +42,4 @@ registry.register(
         },
     },
     handler=handle_think,
-    parallel_safe=True,
 )
