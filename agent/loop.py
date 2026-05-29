@@ -90,14 +90,14 @@ class AgentLoop:
         """
         logger.info("=== run 开始, user_message=%r", user_message[:80])
 
-        self.turn_count += 1
-        if self.session_db and self.session_id:
-            self.session_db.update_turn_count(self.session_id, self.turn_count)
-
         original_message = user_message
 
         self._ensure_conversation_started(user_message)
         logger.debug("会话已初始化, session_id=%s", self.session_id)
+
+        self.turn_count += 1
+        if self.session_db and self.session_id:
+            self.session_db.update_turn_count(self.session_id, self.turn_count)
 
         # 预取记忆并注入到用户消息
         enhanced_message = user_message
