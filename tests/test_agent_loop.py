@@ -36,7 +36,7 @@ def test_agent_loop_basic():
         result = agent.run("你好")
 
     assert result == "你好！我是阿福。"
-    assert len(agent.messages) == 3  # system + user + assistant
+    assert len(agent.message_list) == 3  # system + user + assistant
 
 
 def test_agent_loop_tool_calls_execute():
@@ -68,7 +68,7 @@ def test_agent_loop_tool_calls_execute():
 
     assert result == "命令执行成功，输出 hello"
     # 消息列表应包含工具结果
-    assert any(msg.get("role") == "tool" for msg in agent.messages)
+    assert any(msg.get("role") == "tool" for msg in agent.message_list)
 
 
 def test_agent_loop_budget_exhaustion_uses_single_grace_call():
@@ -100,7 +100,7 @@ def test_agent_loop_budget_exhaustion_uses_single_grace_call():
     assert agent.budget.remaining == 0
     assert any(
         msg.get("role") == "user" and msg.get("content") == "请总结当前进展并给出最终回复。"
-        for msg in agent.messages
+        for msg in agent.message_list
     )
 
 
@@ -145,7 +145,7 @@ def test_agent_loop_preserves_reasoning_content():
     with patch.object(agent.llm, "chat_stream", return_value=iter(events)):
         agent.run("Hi")
 
-    assistant_msgs = [m for m in agent.messages if m["role"] == "assistant"]
+    assistant_msgs = [m for m in agent.message_list if m["role"] == "assistant"]
     assert len(assistant_msgs) == 1
     assert assistant_msgs[0].get("reasoning_content") == "I should greet the user"
 
@@ -167,10 +167,10 @@ def test_agent_loop_restore_session_loads_persisted_messages(tmp_path):
 
     assert restored_count == 2
     assert agent.session_id == "sess-restore"
-    assert agent.messages[0]["role"] == "system"
-    assert len(agent.messages[0]["content"]) > 0
-    assert agent.messages[1] == {"role": "user", "content": "之前的问题"}
-    assert agent.messages[2] == {"role": "assistant", "content": "之前的回答"}
+    assert agent.message_list[0]["role"] == "system"
+    assert len(agent.message_list[0]["content"]) > 0
+    assert agent.message_list[1] == {"role": "user", "content": "之前的问题"}
+    assert agent.message_list[2] == {"role": "assistant", "content": "之前的回答"}
     db.close()
 
 

@@ -205,7 +205,7 @@ class CLIInterface:
             f"已恢复会话 {session_id}（{restored_count} 条历史消息）",
             style="green",
         )
-        non_system = [m for m in self.agent.messages if m.get("role") != "system"]
+        non_system = [m for m in self.agent.message_list if m.get("role") != "system"]
         self._print_conversation(non_system)
 
     def _print_conversation(self, messages: list[dict]) -> None:

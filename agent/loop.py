@@ -73,26 +73,24 @@ class AgentLoop:
             agent_guidance_path=config.agent_guidance_path,
         )
         self._tools_definitions = registry.get_definitions()
-        self.messages: list[dict[str, Any]] = []
+        self.message_list: list[dict[str, Any]] = []
         self.session_id: str | None = None
         self.budget = IterationBudget(self.max_iterations)
         self.turn_count = 0
         self._turns_since_sync = 0
 
-    def run(self, user_message: str) -> str:
+    def run(self, original_message: str) -> str:
         """运行一轮对话，返回最终回复文本
 
         Args:
-            user_message: 用户原始输入
+            original_message: 用户原始输入
 
         Returns:
             Agent 的最终文本回复
         """
-        logger.info("=== run 开始, user_message=%r", user_message[:80])
+        logger.info("=== run 开始, user_message=%r", original_message[:80])
 
-        original_message = user_message
-
-        self._ensure_conversation_started(user_message)
+        self._ensure_conversation_started(original_message)
         logger.debug("会话已初始化, session_id=%s", self.session_id)
 
         self.turn_count += 1
@@ -100,17 +98,17 @@ class AgentLoop:
             self.session_db.update_turn_count(self.session_id, self.turn_count)
 
         # 预取记忆并注入到用户消息
-        enhanced_message = user_message
+        enhanced_message = original_message
         if self.memory_manager:
             logger.debug("正在预取记忆上下文")
-            memory_context = self.memory_manager.prefetch(user_message, limit=self.config.memory.prefetch_limit)
+            memory_context = self.memory_manager.prefetch(original_message, limit=self.config.memory.prefetch_limit)
             if memory_context:
                 logger.debug("记忆上下文内容: %s", memory_context)
-                enhanced_message = inject_context(user_message, memory_context)
+                enhanced_message = inject_context(original_message, memory_context)
                 logger.debug("注入后完整消息: %s", enhanced_message)
 
         user_msg = {"role": "user", "content": enhanced_message}
-        self.messages.append(user_msg)
+        self.message_list.append(user_msg)
         logger.debug("用户消息已追加: %s", user_msg)
 
         if self.session_db and self.session_id:
@@ -129,7 +127,7 @@ class AgentLoop:
         while self.budget.can_continue():
             self.budget.consume()
             logger.info("本次ReAct循环剩余轮数 %d/%d, 消息列表长度=%d",
-                        self.budget.remaining, self.max_iterations, len(self.messages))
+                        self.budget.remaining, self.max_iterations, len(self.message_list))
 
             # 调用 LLM（流式）
             logger.debug("正在调用 LLM 流式接口")
@@ -169,7 +167,7 @@ class AgentLoop:
             logger.info("正在执行工具调用: %s", response["tool_calls"])
             self._persist_assistant_message(response)
             tool_results = self._execute_tool_calls(response["tool_calls"])
-            self.messages.extend(tool_results)
+            self.message_list.extend(tool_results)
 
             # 持久化工具结果
             if self.session_db and self.session_id:
@@ -209,8 +207,8 @@ class AgentLoop:
 
         restored = self.session_db.get_messages_as_conversation(session_id)
         self.session_id = session_id
-        self.messages = [{"role": "system", "content": self.system_prompt}]
-        self.messages.extend(restored)
+        self.message_list = [{"role": "system", "content": self.system_prompt}]
+        self.message_list.extend(restored)
 
         # 恢复压缩状态
         compressed = session.get("compressed_tokens")
@@ -224,8 +222,8 @@ class AgentLoop:
 
     def _ensure_conversation_started(self, first_user_message: str) -> None:
         """初始化当前 AgentLoop 生命周期内的连续对话"""
-        if not self.messages:
-            self.messages.append({"role": "system", "content": self.system_prompt})
+        if not self.message_list:
+            self.message_list.append({"role": "system", "content": self.system_prompt})
 
         if self.session_db and not self.session_id:
             self.session_id = str(uuid.uuid4())
@@ -255,9 +253,9 @@ class AgentLoop:
         self.memory_manager.sync(self.session_id, recent)
 
     def _get_recent_conversation(self, n_turns: int) -> list[dict]:
-        """从 self.messages 提取最近 n 轮 user+assistant 对话"""
+        """从 self.message_list 提取最近 n 轮 user+assistant 对话"""
         pairs: list[dict] = []
-        for msg in reversed(self.messages):
+        for msg in reversed(self.message_list):
             if msg.get("role") in ("user", "assistant"):
                 pairs.append(msg)
                 if len(pairs) >= n_turns * 2:
@@ -268,7 +266,7 @@ class AgentLoop:
     def _estimate_total_tokens(self) -> int:
         """估算当前消息列表的总 token 数"""
         total = 0
-        for msg in self.messages:
+        for msg in self.message_list:
             try:
                 text = json.dumps(msg, ensure_ascii=False)
             except (TypeError, ValueError):
@@ -282,7 +280,7 @@ class AgentLoop:
             return
         estimated_tokens = self._estimate_total_tokens()
         if self.compressor.should_compress(estimated_tokens):
-            self.messages = self.compressor.compress(self.messages, estimated_tokens)
+            self.message_list = self.compressor.compress(self.message_list, estimated_tokens)
             if self.session_db and self.session_id:
                 last = self.compressor.get_last_compressed_tokens()
                 if last:
@@ -296,7 +294,7 @@ class AgentLoop:
         reasoning_content = None
         usage = None
 
-        for event in self.llm.chat_stream(self.messages, tools=tools):
+        for event in self.llm.chat_stream(self.message_list, tools=tools):
             if event["type"] == "content_delta":
                 content_parts.append(event["content"])
                 self.output_callback(event["content"])
@@ -325,7 +323,7 @@ class AgentLoop:
             assistant_msg["tool_calls"] = tool_calls
         if reasoning_content:
             assistant_msg["reasoning_content"] = reasoning_content
-        self.messages.append(assistant_msg)
+        self.message_list.append(assistant_msg)
 
         result: dict[str, Any] = {
             "content": full_content,
@@ -380,7 +378,7 @@ class AgentLoop:
     def _grace_call(self) -> str:
         """预算耗尽后的最后一次调用，让 LLM 产出最终回复"""
         logger.info("正在执行兜底调用")
-        self.messages.append({
+        self.message_list.append({
             "role": "user",
             "content": "请总结当前进展并给出最终回复。",
         })

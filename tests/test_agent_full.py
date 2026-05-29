@@ -84,7 +84,7 @@ def test_agent_loop_with_tool_execution():
 
     assert result == "命令执行成功"
     # 验证消息列表包含工具结果
-    assert any(msg.get("role") == "tool" for msg in agent.messages)
+    assert any(msg.get("role") == "tool" for msg in agent.message_list)
 
 
 def test_agent_loop_with_session_persistence(tmp_path):
@@ -204,5 +204,5 @@ def test_agent_loop_keeps_single_system_prompt_across_runs():
         agent.run("第一轮")
         agent.run("第二轮")
 
-    system_messages = [m for m in agent.messages if m["role"] == "system"]
+    system_messages = [m for m in agent.message_list if m["role"] == "system"]
     assert system_messages == [{"role": "system", "content": agent.system_prompt}]
