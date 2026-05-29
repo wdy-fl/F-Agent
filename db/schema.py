@@ -2,7 +2,7 @@
 
 import sqlite3
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 CREATE_SESSIONS = """
 CREATE TABLE IF NOT EXISTS sessions (
@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     output_tokens INTEGER DEFAULT 0,
     title TEXT,
     tags TEXT,
-    compressed_tokens INTEGER DEFAULT 0
+    compressed_tokens INTEGER DEFAULT 0,
+    turn_count INTEGER DEFAULT 0
 );
 """
 
@@ -104,6 +105,10 @@ def init_db(conn: sqlite3.Connection) -> None:
     if current_version < 3:
         _migrate_v2_to_v3(conn)
 
+    # 迁移：v3 → v4，添加 turn_count 列
+    if current_version < 4:
+        _migrate_v3_to_v4(conn)
+
     # 更新 schema 版本
     if current_version < SCHEMA_VERSION:
         conn.execute("DELETE FROM schema_version")
@@ -137,3 +142,11 @@ def _migrate_v2_to_v3(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE sessions ADD COLUMN tags TEXT")
     if "compressed_tokens" not in columns:
         conn.execute("ALTER TABLE sessions ADD COLUMN compressed_tokens INTEGER DEFAULT 0")
+
+
+def _migrate_v3_to_v4(conn: sqlite3.Connection) -> None:
+    """v3 → v4 迁移：添加 turn_count 列"""
+    cur = conn.execute("PRAGMA table_info(sessions)")
+    columns = {row[1] for row in cur.fetchall()}
+    if "turn_count" not in columns:
+        conn.execute("ALTER TABLE sessions ADD COLUMN turn_count INTEGER DEFAULT 0")

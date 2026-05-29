@@ -91,6 +91,9 @@ class AgentLoop:
         logger.info("=== run 开始, user_message=%r", user_message[:80])
 
         self.turn_count += 1
+        if self.session_db and self.session_id:
+            self.session_db.update_turn_count(self.session_id, self.turn_count)
+
         original_message = user_message
 
         if self._pending_nudge:
@@ -218,6 +221,9 @@ class AgentLoop:
         compressed = session.get("compressed_tokens")
         if compressed:
             self.compressor.set_last_compressed_tokens(compressed)
+
+        # 恢复对话轮数
+        self.turn_count = session.get("turn_count", 0)
 
         return len(restored)
 

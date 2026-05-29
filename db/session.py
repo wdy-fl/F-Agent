@@ -132,6 +132,14 @@ class SessionDB:
         )
         self.conn.commit()
 
+    def update_turn_count(self, session_id: str, count: int) -> None:
+        """更新会话的对话轮数"""
+        self.conn.execute(
+            "UPDATE sessions SET turn_count = ? WHERE id = ?",
+            (count, session_id),
+        )
+        self.conn.commit()
+
     def list_sessions(self, limit: int = 20) -> list[dict]:
         """列出最近的会话"""
         cur = self.conn.execute(
