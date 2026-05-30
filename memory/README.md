@@ -1,9 +1,17 @@
-# memory/ — 记忆与用户建模
+# memory/ — 记忆与上下文围栏
 
-跨会话记忆召回与用户画像管理。
+> 更新时间：2026-05-30
 
-| 模块 | 职责 |
+记忆模块负责跨会话记忆文件的读取、同步、召回和注入，并用上下文围栏区分历史记忆与用户当前输入。它只维护当前代码中存在的记忆管理与围栏能力，不包含单独的用户画像模块。
+
+## 文件职责
+
+| 文件 | 职责 |
 |------|------|
-| manager.py | 记忆管理器：prefetch + sync + 上下文注入 |
-| user_profile.py | 用户建模：USER.md 读写 + LLM 驱动更新 |
-| context_fence.py | 上下文围栏：`<memory-context>` 标签注入/剥离 |
+| `__init__.py` | 标记 `memory` 为 Python 包。 |
+| `context_fence.py` | 生成并注入 `<memory-context>` 围栏，降低记忆内容与当前输入混淆的风险。 |
+| `manager.py` | 管理工作区记忆文件，执行 prefetch、sync、summarize 和 prompt 注入。 |
+
+## 注意事项
+
+- README 只列出当前真实存在的文件；不要恢复已经不存在的用户画像文件条目。
