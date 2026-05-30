@@ -258,7 +258,14 @@ registry.register(
         "type": "function",
         "function": {
             "name": "skill_hub_install",
-            "description": "从 GitHub 或 URL 安装外部技能，安装后重启会话生效",
+            "description": (
+                "从 GitHub 或 URL 安装外部技能。用户要求安装外部技能时，调用前必须先向用户确认技能名称、来源和分类。"
+                "来源包括 GitHub 仓库路径或 URL；分类 category 需询问用户希望归入 dev、tools、testing 等哪类。"
+                "用户不指定分类时，使用技能自带的 category 或默认值 uncategorized。"
+                "GitHub 源调用格式：skill_hub_install(source='github', identifier='owner/repo/path/to/skill', category='用户指定的分类')。"
+                "URL 源调用格式：skill_hub_install(source='url', identifier='https://.../SKILL.md', category='用户指定的分类')。"
+                "安装后提示重启会话生效。"
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {

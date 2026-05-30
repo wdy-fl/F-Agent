@@ -321,3 +321,17 @@ class TestSkillHubRegistered:
         import tools.skill_hub  # noqa: F401 — trigger registration
         names = [d["function"]["name"] for d in registry.get_definitions()]
         assert "skill_hub_install" in names
+
+    def test_skill_hub_install_description_includes_confirmation_contract(self):
+        import tools.skill_hub  # noqa: F401 — trigger registration
+
+        definition = next(
+            d for d in registry.get_definitions()
+            if d["function"]["name"] == "skill_hub_install"
+        )
+        description = definition["function"]["description"]
+
+        assert "先向用户确认技能名称、来源和分类" in description
+        assert "GitHub 源" in description
+        assert "URL 源" in description
+        assert "用户不指定分类时" in description

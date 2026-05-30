@@ -252,3 +252,14 @@ class TestSkillToolsRegistered:
         assert "skills_list" in names
         assert "skill_view" in names
         assert "skill_manage" in names
+
+    def test_skill_manage_description_includes_creation_contract(self):
+        definition = next(
+            d for d in registry.get_definitions()
+            if d["function"]["name"] == "skill_manage"
+        )
+        description = definition["function"]["description"]
+
+        assert "创建前应询问用户希望将技能归入哪个分类" in description
+        assert "用户不指定时使用 uncategorized" in description
+        assert "frontmatter 中填写 category 字段" in description
