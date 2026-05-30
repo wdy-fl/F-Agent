@@ -1,6 +1,8 @@
 """CLI 命令测试"""
 from unittest.mock import patch, MagicMock
 
+import pytest
+
 from cli.interface import CLIInterface
 from config.settings import AppConfig, LLMConfig, set_config
 
@@ -190,3 +192,56 @@ def test_close_continues_to_close_db_when_end_session_fails(tmp_path):
 
     cli.session_db.end_session.assert_called_once_with("sess-active")
     cli.session_db.close.assert_called_once_with()
+
+
+def test_run_quit_closes_cli(tmp_path):
+    cli = make_cli(tmp_path)
+    cli.close = MagicMock()
+
+    with patch.object(cli, "_print_banner"):
+        with patch.object(cli, "_print_goodbye"):
+            with patch.object(cli.prompt_session, "prompt", return_value="/quit"):
+                cli.run()
+
+    cli.close.assert_called_once_with()
+
+
+def test_run_keyboard_interrupt_closes_cli(tmp_path):
+    cli = make_cli(tmp_path)
+    cli.close = MagicMock()
+
+    with patch.object(cli, "_print_banner"):
+        with patch.object(cli, "_print_goodbye"):
+            with patch.object(cli.prompt_session, "prompt", side_effect=KeyboardInterrupt):
+                cli.run()
+
+    cli.close.assert_called_once_with()
+
+
+def test_run_eof_closes_cli(tmp_path):
+    cli = make_cli(tmp_path)
+    cli.close = MagicMock()
+
+    with patch.object(cli, "_print_banner"):
+        with patch.object(cli, "_print_goodbye"):
+            with patch.object(cli.prompt_session, "prompt", side_effect=EOFError):
+                cli.run()
+
+    cli.close.assert_called_once_with()
+
+
+def test_run_unhandled_exception_closes_cli_and_reraises_original(tmp_path):
+    cli = make_cli(tmp_path)
+    cli.close = MagicMock()
+    original_error = RuntimeError("agent failed")
+    cli.agent.session_id = "sess-active"
+
+    with patch.object(cli, "_print_banner"):
+        with patch.object(cli.console, "print"):
+            with patch.object(cli.prompt_session, "prompt", return_value="hello"):
+                with patch.object(cli.agent, "run", side_effect=original_error):
+                    with pytest.raises(RuntimeError) as exc_info:
+                        cli.run()
+
+    assert exc_info.value is original_error
+    cli.close.assert_called_once_with()

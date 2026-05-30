@@ -55,49 +55,50 @@ class CLIInterface:
         """启动 CLI 交互循环"""
         self._print_banner()
 
-        while True:
-            try:
-                user_input = self.prompt_session.prompt("你: ").strip()
-            except (EOFError, KeyboardInterrupt):
-                self._print_goodbye()
-                break
-
-            if not user_input:
-                continue
-
-            # 命令处理
-            if user_input.startswith("/"):
-                if self._handle_command(user_input):
+        try:
+            while True:
+                try:
+                    user_input = self.prompt_session.prompt("你: ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    self._print_goodbye()
                     break
-                continue
 
-            # 运行 Agent
-            self._interrupted = False
-            self.console.print("阿福: ", style="bold green")
-            self._stream_buffer = ""
+                if not user_input:
+                    continue
 
-            try:
-                with Live(Text(""), console=self.console, transient=False, refresh_per_second=15) as live:
-                    self._live = live
-                    try:
-                        set_approval_context(session_id=self.agent.session_id)
-                        result = self.agent.run(user_input)
-                    except KeyboardInterrupt:
-                        self.agent.budget.interrupt()
-                        live.stop()
-                        self.console.print("[已中断]", style="yellow")
-                        self._live = None
-                        continue
+                # 命令处理
+                if user_input.startswith("/"):
+                    if self._handle_command(user_input):
+                        break
+                    continue
 
-                    if result:
-                        live.update(Markdown(result))
-            except Exception:
-                self._live = None
-                raise
-            finally:
-                self._live = None
+                # 运行 Agent
+                self._interrupted = False
+                self.console.print("阿福: ", style="bold green")
+                self._stream_buffer = ""
 
-        self.close()
+                try:
+                    with Live(Text(""), console=self.console, transient=False, refresh_per_second=15) as live:
+                        self._live = live
+                        try:
+                            set_approval_context(session_id=self.agent.session_id)
+                            result = self.agent.run(user_input)
+                        except KeyboardInterrupt:
+                            self.agent.budget.interrupt()
+                            live.stop()
+                            self.console.print("[已中断]", style="yellow")
+                            self._live = None
+                            continue
+
+                        if result:
+                            live.update(Markdown(result))
+                except Exception:
+                    self._live = None
+                    raise
+                finally:
+                    self._live = None
+        finally:
+            self.close()
 
     def close(self) -> None:
         """清理各组件资源"""
