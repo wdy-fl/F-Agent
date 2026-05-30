@@ -25,8 +25,7 @@ def handle_memory(args: dict) -> str:
 
     Actions:
         search: FTS5 全文搜索历史消息
-        read_profile: 读取用户画像
-        update_profile: LLM 驱动的画像更新
+        read_profile / update_profile: 用户画像读写
         read_memory / append_memory: Agent 笔记读写
         read_soul / update_soul: 身份描述读写
         read_agent / update_agent: 行为指引读写
