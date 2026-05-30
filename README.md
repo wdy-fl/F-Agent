@@ -125,12 +125,8 @@ F-Agent/
 │   ├── SOUL.md                # Agent 自我设定与长期原则
 │   ├── AGENT.md               # Agent 行为指引
 │   ├── logs/                  # 运行日志
-│   │   └── agent.log
 │   ├── history/               # CLI 输入历史等本地历史数据
-│   └── skills/                # 本地技能目录，按分类组织 SKILL.md
-│       ├── .hub/              # 外部技能源安装状态与锁文件
-│       │   └── lock.json
-│       └── uncategorized/     # 未分类技能
+│   └── skills/                # 技能仓库
 ```
 
 ## 测试
