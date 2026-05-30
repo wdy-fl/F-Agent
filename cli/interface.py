@@ -45,6 +45,9 @@ class CLIInterface:
         # 中断标志
         self._interrupted = False
 
+        # 关闭状态
+        self._closed = False
+
         set_approval_callback(self._approval_callback)
         set_approval_context(mode=self.config.approval.mode)
 
@@ -98,7 +101,21 @@ class CLIInterface:
 
     def close(self) -> None:
         """清理各组件资源"""
-        self.session_db.close()
+        if self._closed:
+            return
+        self._closed = True
+
+        session_id = self.agent.session_id
+        if session_id:
+            try:
+                self.session_db.end_session(session_id)
+            except Exception:
+                logger.exception("结束会话失败: session_id=%s", session_id)
+
+        try:
+            self.session_db.close()
+        except Exception:
+            logger.exception("关闭会话数据库失败")
 
     def _on_stream_delta(self, text: str) -> None:
         """流式输出回调：将文本增量刷新到 Live 区域"""

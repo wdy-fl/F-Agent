@@ -1,7 +1,23 @@
 """CLI 命令测试"""
 from unittest.mock import patch, MagicMock
+
 from cli.interface import CLIInterface
 from config.settings import AppConfig, LLMConfig, set_config
+
+
+def make_cli(tmp_path):
+    config = AppConfig(
+        llm=LLMConfig(api_key="sk-test"),
+        db_path=str(tmp_path / "state.db"),
+        user_profile_path=str(tmp_path / "USER.md"),
+        memory_path=str(tmp_path / "MEMORY.md"),
+        soul_path=str(tmp_path / "SOUL.md"),
+        agent_guidance_path=str(tmp_path / "AGENT.md"),
+        skills_dir=str(tmp_path / "skills"),
+        log_dir=str(tmp_path / "logs"),
+    )
+    set_config(config)
+    return CLIInterface()
 
 
 def test_list_sessions_with_indices():
@@ -125,3 +141,52 @@ def test_print_conversation_truncates_long_tool_output():
     assert "..." in combined
     assert long_content[:200] in combined
     cli.close()
+
+
+def test_close_marks_active_session_and_closes_db(tmp_path):
+    cli = make_cli(tmp_path)
+    cli.agent.session_id = "sess-active"
+    cli.session_db.end_session = MagicMock()
+    cli.session_db.close = MagicMock()
+
+    cli.close()
+
+    cli.session_db.end_session.assert_called_once_with("sess-active")
+    cli.session_db.close.assert_called_once_with()
+
+
+def test_close_is_idempotent(tmp_path):
+    cli = make_cli(tmp_path)
+    cli.agent.session_id = "sess-active"
+    cli.session_db.end_session = MagicMock()
+    cli.session_db.close = MagicMock()
+
+    cli.close()
+    cli.close()
+
+    cli.session_db.end_session.assert_called_once_with("sess-active")
+    cli.session_db.close.assert_called_once_with()
+
+
+def test_close_without_session_only_closes_db(tmp_path):
+    cli = make_cli(tmp_path)
+    cli.agent.session_id = None
+    cli.session_db.end_session = MagicMock()
+    cli.session_db.close = MagicMock()
+
+    cli.close()
+
+    cli.session_db.end_session.assert_not_called()
+    cli.session_db.close.assert_called_once_with()
+
+
+def test_close_continues_to_close_db_when_end_session_fails(tmp_path):
+    cli = make_cli(tmp_path)
+    cli.agent.session_id = "sess-active"
+    cli.session_db.end_session = MagicMock(side_effect=RuntimeError("end failed"))
+    cli.session_db.close = MagicMock()
+
+    cli.close()
+
+    cli.session_db.end_session.assert_called_once_with("sess-active")
+    cli.session_db.close.assert_called_once_with()
