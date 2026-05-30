@@ -11,6 +11,7 @@ workspace/
 .vscode/
 .claude/
 .worktrees/
+worktrees/
 *.swp
 *.swo
 .DS_Store

@@ -4,7 +4,7 @@
 
 F-Agent（阿福）是一个可运行、可扩展、可进化的个人 Agent。它通过本地 CLI 与用户交互，围绕多轮对话、工具调用、会话持久化、记忆、技能和上下文压缩构建核心闭环。
 
-当前版本聚焦本地研发助手能力，不把路线图能力包装成已完成平台。当前已支持 CLI 常驻期间的定时 Agent prompt 调度；多平台接入、子 Agent 委托、MCP、Web Dashboard 等能力仍处于后续规划阶段。
+聚焦本地研发助手能力，当前已支持 CLI 常驻期间的定时 Agent prompt 调度；子 Agent 委托、MCP、Web Dashboard、多平台接入 等能力仍处于后续规划阶段。
 
 ## 核心理念
 
@@ -53,17 +53,9 @@ cp config.yaml.example workspace/config.yaml
 # 启动阿福
 python3 main.py
 # 或使用启动脚本
-./start.sh          # macOS / Linux
-./start.ps1         # Windows PowerShell
+./start.sh
 ```
 
-也可以安装为开发模式后使用脚本入口：
-
-```bash
-source .venv/bin/activate
-pip install -e ".[dev]"
-fagent
-```
 
 ## 配置说明
 
@@ -126,18 +118,20 @@ F-Agent/
 │   └── approval.py
 ├── tests/                     # pytest 测试
 ├── workspace/                 # 运行时配置、数据库、日志、记忆和技能
-├── GOAL.md                    # 项目目标与路线图
-└── ARCHITECTURE.md            # 架构设计文档
+│   ├── config.yaml            # 本地运行配置，通常由 config.yaml.example 复制生成
+│   ├── state.db               # SQLite 运行时数据库，保存会话、工具调用、统计和定时任务等数据
+│   ├── USER.md                # 用户画像与长期偏好
+│   ├── MEMORY.md              # 长期记忆索引与内容
+│   ├── SOUL.md                # Agent 自我设定与长期原则
+│   ├── AGENT.md               # Agent 行为指引
+│   ├── logs/                  # 运行日志
+│   │   └── agent.log
+│   ├── history/               # CLI 输入历史等本地历史数据
+│   └── skills/                # 本地技能目录，按分类组织 SKILL.md
+│       ├── .hub/              # 外部技能源安装状态与锁文件
+│       │   └── lock.json
+│       └── uncategorized/     # 未分类技能
 ```
-
-## 文档入口
-
-| 文档 | 说明 |
-|------|------|
-| `GOAL.md` | 项目定位、当前能力、路线图和设计原则 |
-| `ARCHITECTURE.md` | 分层架构、核心流程、工具、记忆、技能、数据库设计 |
-| `CLAUDE.md` | 项目开发规范、文档路由和子 Agent 分工规范 |
-| `docs/dev-sop.md` | Agent 开发 SOP |
 
 ## 测试
 
