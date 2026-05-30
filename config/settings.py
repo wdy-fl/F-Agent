@@ -76,6 +76,14 @@ class SkillsHubConfig:
 
 
 @dataclass
+class CronConfig:
+    """定时任务配置"""
+    enabled: bool = True
+    tick_interval_seconds: int = 60
+    grace_seconds: int = 120
+
+
+@dataclass
 class AppConfig:
     """应用全局配置"""
     llm: LLMConfig = field(default_factory=LLMConfig)
@@ -84,6 +92,7 @@ class AppConfig:
     compressor: CompressorConfig = field(default_factory=CompressorConfig)
     approval: ApprovalConfig = field(default_factory=ApprovalConfig)
     skills_hub: SkillsHubConfig = field(default_factory=SkillsHubConfig)
+    cron: CronConfig = field(default_factory=CronConfig)
     mysql: MySQLConfig | None = None
     db_path: str = str(DEFAULT_DB_PATH)
     user_profile_path: str = str(DEFAULT_USER_PROFILE_PATH)
@@ -123,6 +132,7 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
     compressor_dict = config_dict.pop("compressor", {})
     approval_dict = config_dict.pop("approval", {})
     skills_hub_dict = config_dict.pop("skills_hub", {})
+    cron_dict = config_dict.pop("cron", {})
     mysql_dict = config_dict.pop("mysql", None)
 
     return AppConfig(
@@ -133,6 +143,7 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
         mysql=MySQLConfig(**mysql_dict) if mysql_dict else None,
         approval=ApprovalConfig(**approval_dict) if approval_dict else ApprovalConfig(),
         skills_hub=SkillsHubConfig(**skills_hub_dict) if skills_hub_dict else SkillsHubConfig(),
+        cron=CronConfig(**cron_dict) if cron_dict else CronConfig(),
         **config_dict,
     )
 

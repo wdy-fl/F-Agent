@@ -13,6 +13,7 @@ dependencies = [
     "rich>=13.0.0",
     "pyyaml>=6.0",
     "pymysql>=1.1.0",
+    "croniter>=2.0.0",
 ]
 
 [project.optional-dependencies]
