@@ -62,7 +62,7 @@ class TestCheckAllGuards:
 
     def setup_method(self):
         set_approval_callback(None)
-        set_approval_context(mode="manual", session_id=None)
+        set_approval_context(mode="manual", session_id=None, allowed_dangerous_keys=None)
 
     def test_hardline_blocked(self):
         result = check_all_guards("rm -rf /")
@@ -88,6 +88,63 @@ class TestCheckAllGuards:
     def test_mode_off_skips_dangerous(self):
         set_approval_context(mode="off")
         result = check_all_guards("rm -rf node_modules")
+        assert result["approved"] is True
+        assert result["status"] == "bypass"
+
+    def test_allowed_dangerous_key_skips_callback(self):
+        call_count = [0]
+
+        def cb(cmd, desc, key):
+            call_count[0] += 1
+            return "deny"
+
+        set_approval_callback(cb)
+        set_approval_context(allowed_dangerous_keys=["rm_rf"])
+
+        result = check_all_guards("rm -rf build")
+
+        assert result["approved"] is True
+        assert result["status"] == "cron_allowed"
+        assert call_count[0] == 0
+
+    def test_allowed_dangerous_key_does_not_bypass_hardline(self):
+        set_approval_context(allowed_dangerous_keys=["rm_system"])
+
+        result = check_all_guards("rm -rf /")
+
+        assert result["approved"] is False
+        assert result["status"] == "hardline"
+
+    def test_allowed_dangerous_keys_cleared_when_context_resets_with_none(self):
+        set_approval_context(allowed_dangerous_keys=["rm_rf"])
+        allowed_result = check_all_guards("rm -rf build")
+        assert allowed_result["approved"] is True
+        assert allowed_result["status"] == "cron_allowed"
+
+        set_approval_context(allowed_dangerous_keys=None)
+        result = check_all_guards("rm -rf build")
+
+        assert result["approved"] is False
+        assert result["status"] == "no_callback"
+
+    def test_session_update_does_not_reset_mode_or_allowed_keys(self):
+        set_approval_context(mode="off", allowed_dangerous_keys=["git_push_force"])
+        set_approval_context(session_id="sess-mode")
+
+        bypass_result = check_all_guards("rm -rf build")
+        allowed_result = check_all_guards("git push --force origin main")
+
+        assert bypass_result["approved"] is True
+        assert bypass_result["status"] == "bypass"
+        assert allowed_result["approved"] is True
+        assert allowed_result["status"] == "cron_allowed"
+
+    def test_explicit_none_clears_allowed_keys_without_resetting_mode(self):
+        set_approval_context(mode="off", allowed_dangerous_keys=["rm_rf"])
+        set_approval_context(allowed_dangerous_keys=None)
+
+        result = check_all_guards("rm -rf build")
+
         assert result["approved"] is True
         assert result["status"] == "bypass"
 

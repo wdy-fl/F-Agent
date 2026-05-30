@@ -2,6 +2,7 @@
 
 import re
 import threading
+from contextvars import ContextVar
 from typing import Callable
 
 ApprovalCallback = Callable[[str, str, str], str]
@@ -65,9 +66,12 @@ _dangerous_compiled: list[tuple[re.Pattern, str, str]] = [
 # Global state (thread-safe)
 # ============================================================
 
+_UNSET = object()
+
 _approval_callback: ApprovalCallback | None = None
-_approval_mode: str = "manual"
-_approval_session_id: str | None = None
+_approval_mode: ContextVar[str] = ContextVar("approval_mode", default="manual")
+_approval_session_id: ContextVar[str | None] = ContextVar("approval_session_id", default=None)
+_allowed_dangerous_keys: ContextVar[frozenset[str]] = ContextVar("allowed_dangerous_keys", default=frozenset())
 _session_approved: dict[str, set[str]] = {}
 _lock = threading.Lock()
 
@@ -84,12 +88,26 @@ def _get_approval_callback() -> ApprovalCallback | None:
         return _approval_callback
 
 
-def set_approval_context(mode: str = "manual", session_id: str | None = None) -> None:
+def set_approval_context(
+    mode: str | object = _UNSET,
+    session_id: str | None | object = _UNSET,
+    allowed_dangerous_keys: list[str] | None | object = _UNSET,
+) -> None:
     """设置审批上下文，在每个 Agent 运行前调用。"""
-    global _approval_mode, _approval_session_id
-    with _lock:
-        _approval_mode = mode
-        _approval_session_id = session_id
+    if mode is _UNSET and session_id is _UNSET and allowed_dangerous_keys is _UNSET:
+        _approval_mode.set("manual")
+        _approval_session_id.set(None)
+        _allowed_dangerous_keys.set(frozenset())
+        return
+
+    if isinstance(mode, str):
+        _approval_mode.set(mode)
+    if session_id is None or isinstance(session_id, str):
+        _approval_session_id.set(session_id)
+    if allowed_dangerous_keys is None:
+        _allowed_dangerous_keys.set(frozenset())
+    elif isinstance(allowed_dangerous_keys, list):
+        _allowed_dangerous_keys.set(frozenset(allowed_dangerous_keys))
 
 
 def _normalize_command(command: str) -> str:
@@ -140,9 +158,19 @@ def check_all_guards(command: str) -> dict:
     if level is None:
         return {"approved": True, "message": "", "status": "safe"}
 
-    with _lock:
-        mode = _approval_mode
-        session_id = _approval_session_id
+    if key is None or description is None:
+        return {
+            "approved": False,
+            "message": f"危险命令检测结果缺少授权信息\n命令: {command}",
+            "status": "invalid_detection",
+        }
+
+    mode = _approval_mode.get()
+    session_id = _approval_session_id.get()
+    allowed_dangerous_keys = _allowed_dangerous_keys.get()
+
+    if key in allowed_dangerous_keys:
+        return {"approved": True, "message": "", "status": "cron_allowed"}
 
     if mode == "off":
         return {"approved": True, "message": "", "status": "bypass"}
