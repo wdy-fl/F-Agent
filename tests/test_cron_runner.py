@@ -1,8 +1,11 @@
+import threading
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 import pytest
 
 from config.settings import AppConfig, ApprovalConfig, get_config, set_config
+from tools.cron import set_cron_store
 from cron.models import JOB_ACTIVE, RUN_FAILED, RUN_SUCCESS, SCHEDULE_INTERVAL, SCHEDULE_ONCE, CronJob
 
 
@@ -102,6 +105,38 @@ def reset_config():
     set_config(AppConfig(approval=ApprovalConfig(mode="off")))
     yield
     set_config(original)
+
+
+def test_run_job_sets_cron_tool_store_for_background_agent_context():
+    from cron.runner import CronRunner
+    import tools.cron as cron_tool
+
+    main_store = FakeStore()
+    background_store = FakeStore()
+    session_db = FakeSessionDB()
+    set_cron_store(main_store)
+    selected_store = []
+
+    def agent_factory(**kwargs):
+        selected_store.append(cron_tool._get_store())
+        return FakeAgent(session_id="session-1", result="ok")
+
+    runner = CronRunner(
+        background_store,
+        session_db,
+        agent_factory=agent_factory,
+        clock=Clock(
+            datetime(2026, 5, 30, 10, 1, tzinfo=timezone.utc),
+            datetime(2026, 5, 30, 10, 2, tzinfo=timezone.utc),
+        ),
+        id_factory=lambda: "run-1",
+        approval_context_setter=lambda **kwargs: None,
+    )
+
+    runner.run_job(make_job(), BASE)
+
+    assert selected_store == [background_store]
+    assert cron_tool._get_store() is background_store
 
 
 def test_success_run_creates_fresh_agent_records_success_updates_job_and_ends_session():
@@ -330,6 +365,54 @@ def test_schedule_metadata_error_records_failed_run_without_running_agent():
             },
         )
     ]
+
+
+def test_run_job_executes_agent_loop_with_timeout_from_background_thread(tmp_path):
+    from agent.loop import AgentLoop
+    from config.settings import LLMConfig
+    from cron.runner import CronRunner
+    from db.session import SessionDB
+
+    db = SessionDB(tmp_path / "cron-agent.db")
+    store = FakeStore()
+    run_results = []
+    errors = []
+    config = get_config()
+    set_config(AppConfig(llm=LLMConfig(api_key="sk-test", request_timeout=1.0), approval=config.approval))
+
+    def stream_events(*args, **kwargs):
+        return iter([
+            {"type": "content_delta", "content": "后台完成"},
+            {"type": "done", "finish_reason": "stop", "content": "后台完成", "tool_calls": None},
+        ])
+
+    def run_in_background():
+        try:
+            runner = CronRunner(
+                store,
+                db,
+                agent_factory=lambda **kwargs: AgentLoop(**kwargs),
+                clock=Clock(
+                    datetime(2026, 5, 30, 10, 1, tzinfo=timezone.utc),
+                    datetime(2026, 5, 30, 10, 2, tzinfo=timezone.utc),
+                ),
+                id_factory=lambda: "run-1",
+                approval_context_setter=lambda **kwargs: None,
+            )
+            with patch("llm.client.LLMClient.chat_stream", side_effect=stream_events):
+                run_results.append(runner.run_job(make_job(), BASE))
+        except Exception as exc:
+            errors.append(exc)
+
+    thread = threading.Thread(target=run_in_background)
+    thread.start()
+    thread.join()
+    db.close()
+
+    assert errors == []
+    assert len(run_results) == 1
+    assert run_results[0].status == RUN_SUCCESS
+    assert run_results[0].summary == "后台完成"
 
 
 def test_naive_started_at_is_rejected_before_agent_run_and_without_writing_run():

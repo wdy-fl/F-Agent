@@ -3,6 +3,7 @@
 import json
 import logging
 import signal
+import threading
 import uuid
 from pathlib import Path
 from typing import Any, Callable
@@ -299,15 +300,17 @@ class AgentLoop:
         reasoning_content = None
         usage = None
         timeout_seconds = self.config.llm.request_timeout
+        use_signal_timeout = timeout_seconds > 0 and threading.current_thread() is threading.main_thread()
         previous_handler = None
 
-        def _raise_timeout(_signum, _frame):
+        def _raise_timeout(signum, frame):
+            del signum, frame
             raise LLMStreamTimeoutError(
                 f"LLM 调用超过 {timeout_seconds} 秒未完成，已中断。"
             )
 
         try:
-            if timeout_seconds > 0:
+            if use_signal_timeout:
                 previous_handler = signal.getsignal(signal.SIGALRM)
                 signal.signal(signal.SIGALRM, _raise_timeout)
                 signal.setitimer(signal.ITIMER_REAL, timeout_seconds)
@@ -333,7 +336,7 @@ class AgentLoop:
                 "finish_reason": "error",
             }
         finally:
-            if timeout_seconds > 0:
+            if use_signal_timeout:
                 signal.setitimer(signal.ITIMER_REAL, 0)
                 if previous_handler is not None:
                     signal.signal(signal.SIGALRM, previous_handler)

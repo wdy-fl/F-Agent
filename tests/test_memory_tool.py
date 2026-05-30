@@ -1,5 +1,6 @@
 """memory 工具测试：工具注册 + handler 各 action"""
 
+import threading
 from unittest.mock import MagicMock
 
 from tools.memory import handle_memory, set_managers
@@ -28,8 +29,30 @@ def test_memory_tool_is_registered():
     assert "memory" in names
 
 
+def test_memory_manager_is_thread_isolated():
+    main_memory = setup_manager()
+    background_memory = MagicMock()
+    background_memory.get_memory.return_value = "后台记忆"
+    background_results = []
+
+    def set_background_manager():
+        set_managers(memory_manager=background_memory)
+        background_results.append(handle_memory({"action": "read_memory"}))
+
+    thread = threading.Thread(target=set_background_manager)
+    thread.start()
+    thread.join()
+    main_result = handle_memory({"action": "read_memory"})
+
+    assert len(background_results) == 1
+    assert "后台记忆" in background_results[0]
+    assert "笔记内容" in main_result
+    assert main_memory.get_memory.called
+    assert background_memory.get_memory.called
+
+
 def test_handle_search():
-    mock_memory = setup_manager()
+    setup_manager()
     import json
     result = json.loads(handle_memory({"action": "search", "query": "测试"}))
     assert len(result) == 1
@@ -72,7 +95,7 @@ def test_handle_read_profile():
 
 
 def test_handle_read_memory():
-    mock_memory = setup_manager()
+    setup_manager()
     import json
     result = json.loads(handle_memory({"action": "read_memory"}))
     assert result["content"] == "笔记内容"

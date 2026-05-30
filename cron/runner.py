@@ -10,7 +10,8 @@ from cron.models import RUN_FAILED, RUN_SUCCESS, CronJob, CronRun
 from cron.parser import compute_following_run
 from cron.store import CronStore
 from db.session import SessionDB
-from tools.approval import set_approval_context
+from tools.approval import set_approval_callback, set_approval_context
+from tools.cron import set_cron_confirm_callback, set_cron_store
 
 
 def _now() -> datetime:
@@ -82,7 +83,10 @@ class CronRunner:
                 )
                 return run
 
-            agent = self.agent_factory(session_db=self.session_db, output_callback=lambda _text: None)
+            set_approval_callback(None)
+            set_cron_confirm_callback(None)
+            set_cron_store(self.store)
+            agent = self.agent_factory(session_db=self.session_db, output_callback=lambda text: len(text))
             mode = get_config().approval.mode
 
             try:

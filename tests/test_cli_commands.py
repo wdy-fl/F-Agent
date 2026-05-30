@@ -1,15 +1,18 @@
 """CLI 命令测试"""
+from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
 
 import pytest
 
 from cli.interface import CLIInterface
-from config.settings import AppConfig, LLMConfig, set_config
+from config.settings import AppConfig, CronConfig, LLMConfig, set_config
+from cron.models import CronJob, CronRun, RUN_FAILED, RUN_SUCCESS
 
 
 def make_cli(tmp_path):
     config = AppConfig(
         llm=LLMConfig(api_key="sk-test"),
+        cron=CronConfig(enabled=False),
         db_path=str(tmp_path / "state.db"),
         user_profile_path=str(tmp_path / "USER.md"),
         memory_path=str(tmp_path / "MEMORY.md"),
@@ -24,7 +27,7 @@ def make_cli(tmp_path):
 
 def test_list_sessions_with_indices():
     """验证 /sessions 输出带有序号"""
-    config = AppConfig(llm=LLMConfig(api_key="sk-test"))
+    config = AppConfig(llm=LLMConfig(api_key="sk-test"), cron=CronConfig(enabled=False))
     set_config(config)
     cli = CLIInterface()
 
@@ -46,7 +49,7 @@ def test_list_sessions_with_indices():
 
 def test_resume_interactive_valid_choice():
     """验证交互式恢复选择有效序号"""
-    config = AppConfig(llm=LLMConfig(api_key="sk-test"))
+    config = AppConfig(llm=LLMConfig(api_key="sk-test"), cron=CronConfig(enabled=False))
     set_config(config)
     cli = CLIInterface()
 
@@ -66,7 +69,7 @@ def test_resume_interactive_valid_choice():
 
 def test_resume_interactive_invalid_choice():
     """验证交互式恢复选择无效序号时提示错误"""
-    config = AppConfig(llm=LLMConfig(api_key="sk-test"))
+    config = AppConfig(llm=LLMConfig(api_key="sk-test"), cron=CronConfig(enabled=False))
     set_config(config)
     cli = CLIInterface()
 
@@ -86,7 +89,7 @@ def test_resume_interactive_invalid_choice():
 
 def test_resume_interactive_empty_sessions():
     """验证无历史会话时的提示"""
-    config = AppConfig(llm=LLMConfig(api_key="sk-test"))
+    config = AppConfig(llm=LLMConfig(api_key="sk-test"), cron=CronConfig(enabled=False))
     set_config(config)
     cli = CLIInterface()
 
@@ -102,7 +105,7 @@ def test_resume_interactive_empty_sessions():
 
 def test_print_conversation_formats_roles():
     """验证对话历史按角色打印"""
-    config = AppConfig(llm=LLMConfig(api_key="sk-test"))
+    config = AppConfig(llm=LLMConfig(api_key="sk-test"), cron=CronConfig(enabled=False))
     set_config(config)
     cli = CLIInterface()
 
@@ -126,7 +129,7 @@ def test_print_conversation_formats_roles():
 
 def test_print_conversation_truncates_long_tool_output():
     """验证长工具输出被截断"""
-    config = AppConfig(llm=LLMConfig(api_key="sk-test"))
+    config = AppConfig(llm=LLMConfig(api_key="sk-test"), cron=CronConfig(enabled=False))
     set_config(config)
     cli = CLIInterface()
 
@@ -245,6 +248,116 @@ def test_run_unhandled_exception_closes_cli_and_reraises_original(tmp_path):
 
     assert exc_info.value is original_error
     cli.close.assert_called_once_with()
+
+
+def test_cli_starts_cron_scheduler_and_registers_cron_tool_state(tmp_path):
+    config = AppConfig(
+        llm=LLMConfig(api_key="sk-test"),
+        cron=CronConfig(enabled=True, tick_interval_seconds=3600),
+        db_path=str(tmp_path / "state.db"),
+        user_profile_path=str(tmp_path / "USER.md"),
+        memory_path=str(tmp_path / "MEMORY.md"),
+        soul_path=str(tmp_path / "SOUL.md"),
+        agent_guidance_path=str(tmp_path / "AGENT.md"),
+        skills_dir=str(tmp_path / "skills"),
+        log_dir=str(tmp_path / "logs"),
+    )
+    set_config(config)
+    cli = CLIInterface()
+
+    try:
+        assert cli.cron_scheduler._thread is not None
+        assert cli.cron_scheduler._thread.is_alive()
+        assert cli.cron_store.conn is cli.session_db.conn
+        assert cli.cron_scheduler_store.conn is cli.cron_session_db.conn
+        assert cli.cron_session_db is not cli.session_db
+        assert cli.cron_scheduler_store.conn is not cli.cron_store.conn
+        assert cli.cron_session_db.db_path == cli.session_db.db_path
+    finally:
+        cli.close()
+
+
+def test_close_stops_cron_scheduler_and_clears_cron_tool_state(tmp_path):
+    cli = make_cli(tmp_path)
+    cli.cron_scheduler.stop = MagicMock()
+    cli.cron_session_db.close = MagicMock()
+    cli.session_db.close = MagicMock()
+
+    cli.close()
+
+    cli.cron_scheduler.stop.assert_called_once_with()
+    cli.cron_session_db.close.assert_called_once_with()
+    cli.session_db.close.assert_called_once_with()
+
+
+def test_cron_confirm_callback_accepts_yes(tmp_path):
+    cli = make_cli(tmp_path)
+    payload = {
+        "name": "standup",
+        "prompt": "prepare standup",
+        "schedule": "10m",
+        "schedule_type": "once",
+        "next_run_at": "2026-05-30T10:10:00+00:00",
+        "allowed_dangerous_keys": ["terminal:git status"],
+    }
+
+    with patch.object(cli.prompt_session, "prompt", return_value="y"):
+        with patch.object(cli.console, "print") as mock_print:
+            assert cli._cron_confirm_callback(payload) is True
+
+    panel = mock_print.call_args_list[0].args[0]
+    assert "定时任务确认" in str(panel.title)
+    assert "standup" in str(panel.renderable)
+    cli.close()
+
+
+def test_cron_confirm_callback_rejects_keyboard_interrupt(tmp_path):
+    cli = make_cli(tmp_path)
+
+    with patch.object(cli.prompt_session, "prompt", side_effect=KeyboardInterrupt):
+        assert cli._cron_confirm_callback({}) is False
+
+    cli.close()
+
+
+def test_on_cron_completed_prints_success_and_failure(tmp_path):
+    cli = make_cli(tmp_path)
+    now = datetime(2026, 5, 30, 10, 0, tzinfo=timezone.utc)
+    job = CronJob(
+        id="job-1",
+        name="summary",
+        prompt="summarize",
+        schedule_expr="10m",
+        schedule_type="once",
+        next_run_at=now,
+        state="active",
+        allowed_dangerous_keys=[],
+        created_at=now,
+        updated_at=now,
+    )
+    success = CronRun(
+        id="run-1",
+        job_id="job-1",
+        scheduled_at=now,
+        status=RUN_SUCCESS,
+        summary="done",
+    )
+    failed = CronRun(
+        id="run-2",
+        job_id="job-1",
+        scheduled_at=now,
+        status=RUN_FAILED,
+        error="boom",
+    )
+
+    with patch.object(cli.console, "print") as mock_print:
+        cli._on_cron_completed(job, success)
+        cli._on_cron_completed(job, failed)
+
+    combined = " ".join(str(args[0]) if args else "" for args, _ in mock_print.call_args_list)
+    assert "summary 完成" in combined
+    assert "summary 失败" in combined
+    cli.close()
 
 
 def test_close_marks_resumed_session_ended_at(tmp_path):

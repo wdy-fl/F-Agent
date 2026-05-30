@@ -68,7 +68,7 @@ _dangerous_compiled: list[tuple[re.Pattern, str, str]] = [
 
 _UNSET = object()
 
-_approval_callback: ApprovalCallback | None = None
+_approval_callback: ContextVar[ApprovalCallback | None] = ContextVar("approval_callback", default=None)
 _approval_mode: ContextVar[str] = ContextVar("approval_mode", default="manual")
 _approval_session_id: ContextVar[str | None] = ContextVar("approval_session_id", default=None)
 _allowed_dangerous_keys: ContextVar[frozenset[str]] = ContextVar("allowed_dangerous_keys", default=frozenset())
@@ -78,14 +78,11 @@ _lock = threading.Lock()
 
 def set_approval_callback(callback: ApprovalCallback | None) -> None:
     """注册审批回调，由 CLI 层在初始化时调用。"""
-    global _approval_callback
-    with _lock:
-        _approval_callback = callback
+    _approval_callback.set(callback)
 
 
 def _get_approval_callback() -> ApprovalCallback | None:
-    with _lock:
-        return _approval_callback
+    return _approval_callback.get()
 
 
 def set_approval_context(

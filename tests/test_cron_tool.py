@@ -1,4 +1,5 @@
 import importlib
+import threading
 import json
 from datetime import datetime, timedelta, timezone
 
@@ -187,6 +188,50 @@ def test_set_cron_store_closes_internal_session_db(monkeypatch):
 
     assert result == {"ok": True, "jobs": []}
     assert closed == ["cron-test.db"]
+
+
+def test_cron_confirm_callback_is_thread_isolated():
+    cron_tool = _load_cron_tool()
+    store = FakeCronStore()
+    calls = []
+    background_result = []
+    cron_tool.set_cron_store(store)
+    cron_tool.set_cron_confirm_callback(lambda payload: calls.append(payload) or True)
+
+    def create_in_background():
+        background_result.append(_decode(cron_tool.run_cron_tool({
+            "action": "create",
+            "name": "background",
+            "prompt": "prompt",
+            "schedule": "10m",
+        })))
+
+    thread = threading.Thread(target=create_in_background)
+    thread.start()
+    thread.join()
+
+    assert background_result == [{"ok": False, "error": "cron confirmation callback is not configured"}]
+    assert calls == []
+    assert store.created == []
+
+
+def test_cron_store_is_thread_isolated():
+    cron_tool = _load_cron_tool()
+    main_store = FakeCronStore()
+    background_store = FakeCronStore()
+    selected_background_store = []
+    cron_tool.set_cron_store(main_store)
+
+    def set_background_store():
+        cron_tool.set_cron_store(background_store)
+        selected_background_store.append(cron_tool._get_store())
+
+    thread = threading.Thread(target=set_background_store)
+    thread.start()
+    thread.join()
+
+    assert selected_background_store == [background_store]
+    assert cron_tool._get_store() is main_store
 
 
 def test_list_returns_jobs_with_serialized_datetimes():

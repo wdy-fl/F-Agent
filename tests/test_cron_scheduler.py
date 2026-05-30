@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from config.settings import CronConfig
-from cron.models import JOB_ACTIVE, JOB_MISSED, SCHEDULE_INTERVAL, CronJob
+from cron.models import JOB_ACTIVE, JOB_MISSED, RUN_SUCCESS, SCHEDULE_INTERVAL, CronJob, CronRun
 
 
 BASE = datetime(2026, 5, 30, 10, 0, tzinfo=timezone.utc)
@@ -32,6 +32,7 @@ class FakeRunner:
         self.calls.append((job.id, scheduled_at))
         if job.id in self.failures:
             raise self.failures[job.id]
+        return CronRun(id=f"run-{job.id}", job_id=job.id, scheduled_at=scheduled_at, status=RUN_SUCCESS)
 
 
 class FakeThread:
@@ -147,6 +148,55 @@ def test_tick_marks_jobs_past_grace_as_missed_without_running_them():
 
     assert store.state_updates == [("missed", JOB_MISSED, BASE)]
     assert runner.calls == [("runnable", BASE - timedelta(seconds=120))]
+
+
+def test_tick_calls_completion_callback_after_successful_run():
+    from cron.scheduler import CronScheduler
+
+    job1 = make_job(id="job-1", next_run_at=BASE)
+    job2 = make_job(id="job-2", next_run_at=BASE + timedelta(seconds=1))
+    store = FakeStore([job1, job2])
+    runner = FakeRunner()
+    completions = []
+    scheduler = CronScheduler(
+        store,
+        runner,
+        CronConfig(grace_seconds=300),
+        clock=lambda: BASE,
+        completion_callback=lambda job, run: completions.append((job.id, run.job_id)),
+    )
+
+    scheduler.tick()
+
+    assert completions == [("job-1", "job-1"), ("job-2", "job-2")]
+
+
+def test_tick_completion_callback_exception_does_not_block_later_due_jobs(caplog):
+    from cron.scheduler import CronScheduler
+
+    job1 = make_job(id="job-1", next_run_at=BASE)
+    job2 = make_job(id="job-2", next_run_at=BASE + timedelta(seconds=1))
+    store = FakeStore([job1, job2])
+    runner = FakeRunner()
+    completions = []
+
+    def callback(job, run):
+        completions.append((job.id, run.job_id))
+        if job.id == "job-1":
+            raise RuntimeError("notify failed")
+
+    scheduler = CronScheduler(
+        store,
+        runner,
+        CronConfig(grace_seconds=300),
+        clock=lambda: BASE,
+        completion_callback=callback,
+    )
+
+    scheduler.tick()
+
+    assert completions == [("job-1", "job-1"), ("job-2", "job-2")]
+    assert "completion callback failed" in caplog.text
 
 
 def test_tick_runner_exception_does_not_block_later_due_jobs(caplog):

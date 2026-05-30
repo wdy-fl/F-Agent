@@ -11,7 +11,12 @@ from rich.text import Text
 
 from agent.loop import AgentLoop
 from config.settings import ensure_config_dir, get_config
+from cron.models import RUN_SUCCESS, CronJob, CronRun
+from cron.runner import CronRunner
+from cron.scheduler import CronScheduler
+from cron.store import CronStore
 from tools.approval import set_approval_callback, set_approval_context
+from tools.cron import set_cron_confirm_callback, set_cron_store
 from db.session import SessionDB
 
 logger = logging.getLogger(__name__)
@@ -27,6 +32,17 @@ class CLIInterface:
 
         # 创建会话数据库（CLIInterface 和 AgentLoop 共享）
         self.session_db = SessionDB(config.db_path)
+
+        self.cron_store = CronStore(self.session_db.conn)
+        self.cron_session_db = SessionDB(config.db_path)
+        self.cron_scheduler_store = CronStore(self.cron_session_db.conn)
+        self.cron_runner = CronRunner(self.cron_scheduler_store, self.cron_session_db)
+        self.cron_scheduler = CronScheduler(
+            self.cron_scheduler_store,
+            self.cron_runner,
+            config.cron,
+            completion_callback=self._on_cron_completed,
+        )
 
         # 创建 Agent 循环（AgentLoop 内部自行创建 llm/memory/compressor 等依赖）
         self.agent = AgentLoop(
@@ -50,6 +66,9 @@ class CLIInterface:
 
         set_approval_callback(self._approval_callback)
         set_approval_context(mode=self.config.approval.mode)
+        set_cron_store(self.cron_store)
+        set_cron_confirm_callback(self._cron_confirm_callback)
+        self.cron_scheduler.start()
 
     def run(self) -> None:
         """启动 CLI 交互循环"""
@@ -114,6 +133,19 @@ class CLIInterface:
                 logger.exception("结束会话失败: session_id=%s", session_id)
 
         try:
+            self.cron_scheduler.stop()
+        except Exception:
+            logger.exception("停止定时任务调度器失败")
+
+        set_cron_confirm_callback(None)
+        set_cron_store(None)
+
+        try:
+            self.cron_session_db.close()
+        except Exception:
+            logger.exception("关闭定时任务数据库失败")
+
+        try:
             self.session_db.close()
         except Exception:
             logger.exception("关闭会话数据库失败")
@@ -125,6 +157,53 @@ class CLIInterface:
         self._stream_buffer += text
         if self._live:
             self._live.update(Text(self._stream_buffer))
+
+    def _cron_confirm_callback(self, payload: dict) -> bool:
+        from rich.panel import Panel
+        from rich.text import Text
+
+        text = Text()
+        text.append("创建定时任务\n\n", style="bold cyan")
+        text.append("名称: ", style="dim")
+        text.append(f"{payload.get('name', '')}\n", style="white")
+        text.append("调度: ", style="dim")
+        text.append(f"{payload.get('schedule', '')}\n", style="white")
+        text.append("类型: ", style="dim")
+        text.append(f"{payload.get('schedule_type', '')}\n", style="white")
+        text.append("下次运行: ", style="dim")
+        text.append(f"{payload.get('next_run_at', '')}\n", style="white")
+        allowed_keys = payload.get("allowed_dangerous_keys") or []
+        if allowed_keys:
+            text.append("危险命令授权: ", style="dim")
+            text.append(f"{', '.join(allowed_keys)}\n", style="yellow")
+        text.append("\nPrompt:\n", style="dim")
+        text.append(f"{payload.get('prompt', '')}\n\n", style="white")
+        text.append("[y] 确认创建\n", style="green")
+        text.append("[n] 取消\n", style="red")
+
+        panel = Panel(text, title="定时任务确认", border_style="cyan")
+        self.console.print(panel)
+
+        while True:
+            try:
+                choice = self.prompt_session.prompt("确认创建定时任务? (y/n): ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                return False
+
+            if choice in ("y", "yes"):
+                return True
+            if choice in ("n", "no"):
+                return False
+            self.console.print("无效选择，请输入 y/n", style="red")
+
+    def _on_cron_completed(self, job: CronJob, run: CronRun) -> None:
+        is_success = run.status == RUN_SUCCESS
+        status_style = "green" if is_success else "red"
+        status = "完成" if is_success else "失败"
+        self.console.print(
+            f"\n[bold cyan]定时任务[/bold cyan] {job.name} {status}: {run.summary or run.error or ''}",
+            style=status_style,
+        )
 
     def _approval_callback(self, command: str, description: str, pattern_key: str) -> str:
         """审批回调：展示危险命令面板，获取用户选择。
@@ -140,7 +219,9 @@ class CLIInterface:
         text.append(f"命令: ", style="dim")
         text.append(f"{command}\n", style="white")
         text.append(f"原因: ", style="dim")
-        text.append(f"{description}\n\n", style="white")
+        text.append(f"{description}\n", style="white")
+        text.append(f"授权键: ", style="dim")
+        text.append(f"{pattern_key}\n\n", style="white")
         text.append("[o] 本次允许  (once)\n", style="green")
         text.append("[s] 会话记住  (session)\n", style="cyan")
         text.append("[d] 拒绝      (deny)\n", style="red")

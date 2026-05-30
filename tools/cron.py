@@ -3,6 +3,7 @@
 import json
 import logging
 import uuid
+from contextvars import ContextVar
 from datetime import datetime
 from typing import Callable, Any
 
@@ -17,41 +18,41 @@ CronConfirmCallback = Callable[[dict], bool]
 
 logger = logging.getLogger(__name__)
 
-_confirm_callback: CronConfirmCallback | None = None
-_store: CronStore | None = None
-_session_db: SessionDB | None = None
-_owns_store = False
+_confirm_callback: ContextVar[CronConfirmCallback | None] = ContextVar("cron_confirm_callback", default=None)
+_store: ContextVar[CronStore | None] = ContextVar("cron_store", default=None)
+_session_db: ContextVar[SessionDB | None] = ContextVar("cron_session_db", default=None)
+_owns_store: ContextVar[bool] = ContextVar("cron_owns_store", default=False)
 
 
 def set_cron_confirm_callback(callback: CronConfirmCallback | None) -> None:
     """Set or clear the callback used to confirm cron job creation."""
-    global _confirm_callback
-    _confirm_callback = callback
+    _confirm_callback.set(callback)
 
 
 def _close_internal_store() -> None:
-    global _session_db, _owns_store
-    if _owns_store and _session_db is not None:
-        _session_db.close()
-    _session_db = None
-    _owns_store = False
+    session_db = _session_db.get()
+    if _owns_store.get() and session_db is not None:
+        session_db.close()
+    _session_db.set(None)
+    _owns_store.set(False)
 
 
 def set_cron_store(store: CronStore | None) -> None:
     """Set or clear the CronStore override used by tests or CLI integration."""
-    global _store, _owns_store
     _close_internal_store()
-    _store = store
-    _owns_store = False
+    _store.set(store)
+    _owns_store.set(False)
 
 
 def _get_store() -> CronStore:
-    global _store, _session_db, _owns_store
-    if _store is None:
-        _session_db = SessionDB(get_config().db_path)
-        _store = CronStore(_session_db.conn)
-        _owns_store = True
-    return _store
+    store = _store.get()
+    if store is None:
+        session_db = SessionDB(get_config().db_path)
+        store = CronStore(session_db.conn)
+        _session_db.set(session_db)
+        _store.set(store)
+        _owns_store.set(True)
+    return store
 
 
 def _json(data: dict[str, Any]) -> str:
@@ -104,9 +105,10 @@ def _create(args: dict, now: datetime) -> str:
         "allowed_dangerous_keys": allowed_dangerous_keys,
     }
 
-    if _confirm_callback is None:
+    confirm_callback = _confirm_callback.get()
+    if confirm_callback is None:
         return _error("cron confirmation callback is not configured")
-    if not _confirm_callback(payload):
+    if not confirm_callback(payload):
         return _json({"ok": False, "cancelled": True})
 
     job = _get_store().create_job(

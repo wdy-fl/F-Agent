@@ -6,7 +6,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from config.settings import CronConfig
-from cron.models import JOB_MISSED
+from cron.models import JOB_MISSED, CronJob, CronRun
 from cron.runner import CronRunner
 from cron.store import CronStore
 
@@ -38,12 +38,14 @@ class CronScheduler:
         config: CronConfig,
         clock: Callable[[], datetime] | None = None,
         thread_factory: Callable[..., threading.Thread] | None = None,
+        completion_callback: Callable[[CronJob, CronRun], None] | None = None,
     ):
         self.store = store
         self.runner = runner
         self.config = config
         self.clock = clock or _now
         self.thread_factory = thread_factory or threading.Thread
+        self.completion_callback = completion_callback
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
 
@@ -71,10 +73,16 @@ class CronScheduler:
                 continue
 
             try:
-                self.runner.run_job(job, scheduled_at=scheduled_at)
+                run = self.runner.run_job(job, scheduled_at=scheduled_at)
             except Exception:
                 logger.exception("Cron job %s runner failed", job.id)
                 continue
+
+            if self.completion_callback is not None:
+                try:
+                    self.completion_callback(job, run)
+                except Exception:
+                    logger.exception("Cron job %s completion callback failed", job.id)
 
     def start(self) -> None:
         if not self.config.enabled:
