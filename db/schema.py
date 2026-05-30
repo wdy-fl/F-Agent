@@ -2,7 +2,7 @@
 
 import sqlite3
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 CREATE_SESSIONS = """
 CREATE TABLE IF NOT EXISTS sessions (
@@ -71,6 +71,40 @@ CREATE TABLE IF NOT EXISTS schema_version (
 );
 """
 
+CREATE_CRON_JOBS = """
+CREATE TABLE IF NOT EXISTS cron_jobs (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    schedule_expr TEXT NOT NULL,
+    schedule_type TEXT NOT NULL,
+    interval_seconds INTEGER,
+    cron_expr TEXT,
+    next_run_at TEXT,
+    state TEXT NOT NULL,
+    allowed_dangerous_keys TEXT DEFAULT '[]',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    last_run_at TEXT,
+    last_status TEXT,
+    last_error TEXT
+);
+"""
+
+CREATE_CRON_RUNS = """
+CREATE TABLE IF NOT EXISTS cron_runs (
+    id TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL REFERENCES cron_jobs(id) ON DELETE CASCADE,
+    session_id TEXT,
+    scheduled_at TEXT NOT NULL,
+    started_at TEXT,
+    finished_at TEXT,
+    status TEXT NOT NULL,
+    summary TEXT,
+    error TEXT
+);
+"""
+
 
 def init_db(conn: sqlite3.Connection) -> None:
     """初始化数据库，创建所有表
@@ -85,6 +119,8 @@ def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(CREATE_SESSIONS)
     conn.executescript(CREATE_MESSAGES)
     conn.executescript(CREATE_SCHEMA_VERSION)
+    conn.executescript(CREATE_CRON_JOBS)
+    conn.executescript(CREATE_CRON_RUNS)
 
     # 兼容旧表：如果 messages 表缺少 reasoning_content 列则添加
     cur = conn.execute("PRAGMA table_info(messages)")
@@ -108,6 +144,10 @@ def init_db(conn: sqlite3.Connection) -> None:
     # 迁移：v3 → v4，添加 turn_count 列
     if current_version < 4:
         _migrate_v3_to_v4(conn)
+
+    # 迁移：v4 → v5，添加定时任务表
+    if current_version < 5:
+        _migrate_v4_to_v5(conn)
 
     # 更新 schema 版本
     if current_version < SCHEMA_VERSION:
@@ -150,3 +190,9 @@ def _migrate_v3_to_v4(conn: sqlite3.Connection) -> None:
     columns = {row[1] for row in cur.fetchall()}
     if "turn_count" not in columns:
         conn.execute("ALTER TABLE sessions ADD COLUMN turn_count INTEGER DEFAULT 0")
+
+
+def _migrate_v4_to_v5(conn: sqlite3.Connection) -> None:
+    """v4 → v5 迁移：添加定时任务表。"""
+    conn.execute(CREATE_CRON_JOBS)
+    conn.execute(CREATE_CRON_RUNS)

@@ -283,3 +283,47 @@ def test_update_compressed_tokens(tmp_path):
     session = db.get_session("sess-comp")
     assert session["compressed_tokens"] == 50000
     db.close()
+
+
+def test_cron_schema_tables_created(tmp_path):
+    from db.schema import SCHEMA_VERSION
+
+    db = SessionDB(tmp_path / "test.db")
+
+    cron_jobs = db.conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='cron_jobs'"
+    ).fetchone()
+    cron_runs = db.conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='cron_runs'"
+    ).fetchone()
+    version_row = db.conn.execute("SELECT version FROM schema_version").fetchone()
+
+    assert cron_jobs is not None
+    assert cron_runs is not None
+    assert version_row is not None
+    assert version_row[0] == SCHEMA_VERSION
+    db.close()
+
+
+def test_cron_runs_cascade_delete_with_job(tmp_path):
+    db = SessionDB(tmp_path / "test.db")
+    db.conn.execute(
+        """INSERT INTO cron_jobs
+           (id, name, prompt, schedule_expr, schedule_type, next_run_at, state, allowed_dangerous_keys, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        ("job-1", "测试", "hello", "10m", "once", "2026-05-30T10:00:00+08:00", "active", "[]", "2026-05-30T09:50:00+08:00", "2026-05-30T09:50:00+08:00"),
+    )
+    db.conn.execute(
+        """INSERT INTO cron_runs
+           (id, job_id, scheduled_at, status)
+           VALUES (?, ?, ?, ?)""",
+        ("run-1", "job-1", "2026-05-30T10:00:00+08:00", "success"),
+    )
+    db.conn.commit()
+
+    db.conn.execute("DELETE FROM cron_jobs WHERE id = ?", ("job-1",))
+    db.conn.commit()
+
+    row = db.conn.execute("SELECT * FROM cron_runs WHERE id = ?", ("run-1",)).fetchone()
+    assert row is None
+    db.close()
