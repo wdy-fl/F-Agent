@@ -245,3 +245,17 @@ def test_run_unhandled_exception_closes_cli_and_reraises_original(tmp_path):
 
     assert exc_info.value is original_error
     cli.close.assert_called_once_with()
+
+
+def test_close_marks_resumed_session_ended_at(tmp_path):
+    cli = make_cli(tmp_path)
+    cli.session_db.create_session("sess-resumed", "deepseek-v4-pro", "system", title="历史会话")
+    cli.agent.session_id = "sess-resumed"
+
+    cli.close()
+
+    reopened = cli.session_db.__class__(tmp_path / "state.db")
+    session = reopened.get_session("sess-resumed")
+    reopened.close()
+    assert session is not None
+    assert session["ended_at"] is not None
