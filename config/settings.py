@@ -33,6 +33,8 @@ class LLMConfig:
 class ToolConfig:
     """工具相关配置"""
     max_result_size: int = 50000
+    baidu_ai_search_api_key: str = ""
+    baidu_ai_search_timeout: float = 30.0
 
 
 @dataclass

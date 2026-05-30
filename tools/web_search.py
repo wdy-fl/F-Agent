@@ -1,14 +1,18 @@
 """Web 搜索与网页抓取工具"""
 
 import json
-from urllib.request import Request, urlopen
 from urllib.error import URLError
+from urllib.request import Request, urlopen
 
+from config.settings import get_config
 from tools.registry import registry
 
 
+BAIDU_AI_SEARCH_URL = "https://qianfan.baidubce.com/v2/ai_search/web_search"
+
+
 def web_search(args: dict) -> str:
-    """执行 Web 搜索（MVP 使用 DuckDuckGo HTML 版）
+    """执行 Web 搜索（使用百度千帆 AI Search API）
 
     Args:
         args: {"query": str, "max_results": int}
@@ -23,26 +27,51 @@ def web_search(args: dict) -> str:
         return json.dumps({"error": "No query provided"}, ensure_ascii=False)
 
     try:
-        from urllib.parse import quote_plus
-        url = f"https://www.baidu.com/s?wd={quote_plus(query)}"
-        req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urlopen(req, timeout=10) as resp:
-            html = resp.read().decode("utf-8", errors="replace")
+        config = get_config()
+        api_key = config.tools.baidu_ai_search_api_key
+        if not api_key:
+            return json.dumps(
+                {"error": "Search failed: missing tools.baidu_ai_search_api_key"},
+                ensure_ascii=False,
+            )
 
+        payload = {
+            "messages": [{"content": query, "role": "user"}],
+            "search_source": "baidu_search_v2",
+            "resource_type_filter": [{"type": "web", "top_k": max_results}],
+            "edition": "standard",
+        }
+        req = Request(
+            BAIDU_AI_SEARCH_URL,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "X-Appbuilder-Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urlopen(req, timeout=config.tools.baidu_ai_search_timeout) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+
+        error_code = result.get("code")
+        if error_code not in (None, "", 0):
+            message = result.get("message", "unknown error")
+            return json.dumps(
+                {"error": f"Search failed: API error {error_code}: {message}"},
+                ensure_ascii=False,
+            )
+
+        references = result.get("references", [])
         results = []
-        import re
-        for match in re.finditer(
-            r'<h3[^>]*class="[^"]*\bt\b[^"]*"[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>\s*</h3>',
-            html,
-            flags=re.DOTALL,
-        ):
-            if len(results) >= max_results:
-                break
-            link = match.group(1)
-            title = re.sub(r"<.*?>", "", match.group(2)).strip()
-            title = re.sub(r"\s+", " ", title)
+        for ref in references[:max_results]:
+            title = ref.get("title", "")
+            link = ref.get("url", "")
             if title and link:
-                results.append({"title": title, "url": link})
+                item = {"title": title, "url": link}
+                content = ref.get("content", "")
+                if content:
+                    item["snippet"] = content
+                results.append(item)
 
         return json.dumps({
             "query": query,

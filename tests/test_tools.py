@@ -161,27 +161,54 @@ def test_builtin_tools_registered():
 
 
 
-def test_web_search_parses_baidu_results(monkeypatch):
-    """百度搜索结果 HTML 被解析为标准工具返回结构"""
+class _FakeToolConfig:
+    def __init__(self, api_key="", timeout=30.0):
+        self.baidu_ai_search_api_key = api_key
+        self.baidu_ai_search_timeout = timeout
+
+
+class _FakeAppConfig:
+    def __init__(self, api_key="", timeout=30.0):
+        self.tools = _FakeToolConfig(api_key=api_key, timeout=timeout)
+
+
+def test_web_search_requires_baidu_ai_search_api_key(monkeypatch):
     _clean_registry()
     import tools.web_search
     importlib.reload(tools.web_search)
 
-    html = """
-    <html>
-      <body>
-        <div class="result c-container xpath-log new-pmd">
-          <h3 class="t">
-            <a href="https://www.baidu.com/link?url=abc123">北京天气预报_中国天气网</a>
-          </h3>
-        </div>
-      </body>
-    </html>
-    """.encode("utf-8")
+    def fail_urlopen(req, timeout):
+        raise AssertionError("urlopen should not be called without API key")
+
+    monkeypatch.setattr(tools.web_search, "get_config", lambda: _FakeAppConfig())
+    monkeypatch.setattr(tools.web_search, "urlopen", fail_urlopen)
+
+    result = tools.web_search.web_search({"query": "北京天气", "max_results": 1})
+    parsed = json.loads(result)
+
+    assert parsed == {"error": "Search failed: missing tools.baidu_ai_search_api_key"}
+
+
+def test_web_search_uses_baidu_ai_search_api(monkeypatch):
+    _clean_registry()
+    import tools.web_search
+    importlib.reload(tools.web_search)
+
+    response_body = json.dumps(
+        {
+            "request_id": "req-1",
+            "code": 0,
+            "references": [
+                {
+                    "title": "北京天气预报_中国天气网",
+                    "url": "https://www.weather.com.cn/weather/101010100.shtml",
+                    "content": "31日（明天） 多云 31 / 20℃",
+                }
+            ],
+        }
+    ).encode("utf-8")
 
     class FakeResponse:
-        headers = {"Content-Type": "text/html; charset=utf-8"}
-
         def __enter__(self):
             return self
 
@@ -189,29 +216,44 @@ def test_web_search_parses_baidu_results(monkeypatch):
             return False
 
         def read(self):
-            return html
+            return response_body
+
+    captured = {}
 
     def fake_urlopen(req, timeout):
-        assert req.full_url == "https://www.baidu.com/s?wd=%E5%8C%97%E4%BA%AC%E5%A4%A9%E6%B0%94"
-        assert timeout == 10
+        captured["url"] = req.full_url
+        captured["timeout"] = timeout
+        captured["headers"] = dict(req.header_items())
+        captured["data"] = json.loads(req.data.decode("utf-8"))
         return FakeResponse()
 
+    monkeypatch.setattr(tools.web_search, "get_config", lambda: _FakeAppConfig(api_key="sk-baidu-test", timeout=12.5))
     monkeypatch.setattr(tools.web_search, "urlopen", fake_urlopen)
 
     result = tools.web_search.web_search({"query": "北京天气", "max_results": 1})
     parsed = json.loads(result)
 
+    assert captured["url"] == "https://qianfan.baidubce.com/v2/ai_search/web_search"
+    assert captured["timeout"] == 12.5
+    assert captured["headers"]["X-appbuilder-authorization"] == "Bearer sk-baidu-test"
+    assert captured["headers"]["Content-type"] == "application/json"
+    assert captured["data"] == {
+        "messages": [{"content": "北京天气", "role": "user"}],
+        "search_source": "baidu_search_v2",
+        "resource_type_filter": [{"type": "web", "top_k": 1}],
+        "edition": "standard",
+    }
     assert parsed == {
         "query": "北京天气",
         "results": [
             {
                 "title": "北京天气预报_中国天气网",
-                "url": "https://www.baidu.com/link?url=abc123",
+                "url": "https://www.weather.com.cn/weather/101010100.shtml",
+                "snippet": "31日（明天） 多云 31 / 20℃",
             }
         ],
         "count": 1,
     }
-
 
 
 def test_terminal_tool():
