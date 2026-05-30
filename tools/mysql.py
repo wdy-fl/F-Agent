@@ -128,16 +128,6 @@ registry.register(
             "name": "mysql_query",
             "description": (
                 "查询本地 MySQL 数据库，仅支持只读操作（SELECT/SHOW/DESCRIBE/EXPLAIN），最多返回 20 行。"
-                "\n\n"
-                "数据库 schema（资源监控数据）：\n"
-                "- it_resource_list: 资源主表，id 对应历史数据表名 it_{id}\n"
-                "- it_resource_index: 指标定义表，id 对应其他表的 index_id\n"
-                "- it_resource_scan: 子资源类型表（磁盘/网卡/分区等分类）\n"
-                "- it_resource_scaning: 子资源实例表，id 对应其他表的 scaning_id（scaning_id=1 表示主资源本身）\n"
-                "- it_value_list: 最新取值表，只存最后一次采集结果（字段同历史表）\n"
-                "- it_{resource_id}: 历史数据分表，每资源一张表，字段：id(时间戳+纳秒，前10位=unix时间)、scaning_id、index_id、index_value\n"
-                "\n"
-                "完整文档: workspace/it_center数据库描述.md"
             ),
             "parameters": {
                 "type": "object",
