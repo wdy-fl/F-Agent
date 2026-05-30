@@ -24,22 +24,23 @@ def web_search(args: dict) -> str:
 
     try:
         from urllib.parse import quote_plus
-        url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
+        url = f"https://www.baidu.com/s?wd={quote_plus(query)}"
         req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urlopen(req, timeout=10) as resp:
             html = resp.read().decode("utf-8", errors="replace")
 
-        # 简单解析搜索结果（提取标题和链接）
         results = []
         import re
         for match in re.finditer(
-            r'<a rel="nofollow" class="result__a" href="([^"]+)"[^>]*>(.*?)</a>',
+            r'<h3[^>]*class="[^"]*\bt\b[^"]*"[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>\s*</h3>',
             html,
+            flags=re.DOTALL,
         ):
             if len(results) >= max_results:
                 break
             link = match.group(1)
             title = re.sub(r"<.*?>", "", match.group(2)).strip()
+            title = re.sub(r"\s+", " ", title)
             if title and link:
                 results.append({"title": title, "url": link})
 

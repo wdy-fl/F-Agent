@@ -161,6 +161,59 @@ def test_builtin_tools_registered():
 
 
 
+def test_web_search_parses_baidu_results(monkeypatch):
+    """百度搜索结果 HTML 被解析为标准工具返回结构"""
+    _clean_registry()
+    import tools.web_search
+    importlib.reload(tools.web_search)
+
+    html = """
+    <html>
+      <body>
+        <div class="result c-container xpath-log new-pmd">
+          <h3 class="t">
+            <a href="https://www.baidu.com/link?url=abc123">北京天气预报_中国天气网</a>
+          </h3>
+        </div>
+      </body>
+    </html>
+    """.encode("utf-8")
+
+    class FakeResponse:
+        headers = {"Content-Type": "text/html; charset=utf-8"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return html
+
+    def fake_urlopen(req, timeout):
+        assert req.full_url == "https://www.baidu.com/s?wd=%E5%8C%97%E4%BA%AC%E5%A4%A9%E6%B0%94"
+        assert timeout == 10
+        return FakeResponse()
+
+    monkeypatch.setattr(tools.web_search, "urlopen", fake_urlopen)
+
+    result = tools.web_search.web_search({"query": "北京天气", "max_results": 1})
+    parsed = json.loads(result)
+
+    assert parsed == {
+        "query": "北京天气",
+        "results": [
+            {
+                "title": "北京天气预报_中国天气网",
+                "url": "https://www.baidu.com/link?url=abc123",
+            }
+        ],
+        "count": 1,
+    }
+
+
+
 def test_terminal_tool():
     """测试终端执行工具"""
     _clean_registry()
