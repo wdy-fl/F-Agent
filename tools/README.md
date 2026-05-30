@@ -1,18 +1,27 @@
 # tools/ — 工具系统
 
-自注册工具集，供 LLM 调用。
+> 更新时间：2026-05-30
 
-| 模块 | 职责 |
+工具模块提供可被 LLM 调用的内置工具，以及工具注册、参数校验、审批和调度能力。每个工具文件通过注册表暴露函数，供 Agent 主循环统一发现和执行。
+
+## 文件职责
+
+| 文件 | 职责 |
 |------|------|
-| registry.py | 工具注册表：自注册 + AST 发现 + 调度 |
-| terminal.py | 终端命令执行 |
-| file_ops.py | 文件读写 + 列目录 |
-| web_search.py | Web 搜索 + 网页抓取 |
-| memory.py | 记忆读写/画像更新（供 LLM 调用） |
-| mysql.py | MySQL 只读查询（供 LLM 调用） |
-| think.py | 中间思考保存，驱动 ReAct 循环 |
-| skill.py | 技能管理（供 LLM 调用） |
+| `__init__.py` | 标记 `tools` 为 Python 包。 |
+| `approval.py` | 定义终端命令风险识别、审批模式和审批结果。 |
+| `cron.py` | 提供定时任务创建、查看、删除等 LLM 工具接口。 |
+| `file_ops.py` | 提供文件读取、写入和目录列举工具。 |
+| `memory.py` | 提供记忆读取、写入、同步和摘要相关工具。 |
+| `mysql.py` | 提供 MySQL 只读查询工具。 |
+| `registry.py` | 管理工具注册、OpenAI schema 存储、结果截断和工具调用串行分发。 |
+| `skill.py` | 提供技能列表、查看、创建、编辑和删除工具。 |
+| `skill_hub.py` | 提供从外部来源安装技能的工具。 |
+| `terminal.py` | 提供终端命令执行工具，并接入危险命令审批。 |
+| `think.py` | 提供中间思考记录工具，用于辅助 ReAct 循环。 |
+| `web_search.py` | 提供 Web 搜索和网页抓取工具。 |
 
-## 注册方式
+## 注意事项
 
-每个工具文件在模块顶层调用 `registry.register()`，启动时由 `registry` 通过 AST 扫描自动发现并导入。
+- 新增工具文件时，需要在 `tools/__init__.py` 中显式导入以触发注册，并补充对应工具测试。
+- 涉及终端执行的变更必须经过 `approval.py` 的风险模型检查。
