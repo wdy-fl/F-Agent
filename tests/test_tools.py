@@ -148,9 +148,11 @@ def test_builtin_tools_registered():
     import tools.terminal
     import tools.file_ops
     import tools.web_search
+    import tools.cron
     importlib.reload(tools.terminal)
     importlib.reload(tools.file_ops)
     importlib.reload(tools.web_search)
+    importlib.reload(tools.cron)
 
     assert global_registry.has_tool("terminal")
     assert global_registry.has_tool("read_file")
@@ -158,6 +160,7 @@ def test_builtin_tools_registered():
     assert global_registry.has_tool("list_files")
     assert global_registry.has_tool("web_search")
     assert global_registry.has_tool("web_fetch")
+    assert global_registry.has_tool("cron")
 
 
 
